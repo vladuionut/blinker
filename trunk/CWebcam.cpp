@@ -1,14 +1,7 @@
-
 #include "stdafx.h"
 #include "CWebcam.h"
 #include <FL/fl_ask.H>
 
-CWebcam::~CWebcam() {
-	if(capture)
-		cvReleaseCapture(&capture);
-	if (frame)
-		cvReleaseImage(&frame);
-}
 
 void CWebcam::captureFromCamera(int index) {
 	capture = cvCaptureFromCAM(index );
