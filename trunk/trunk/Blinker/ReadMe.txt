@@ -1,33 +1,36 @@
-========================================================================
-    CONSOLE APPLICATION : Blinker Project Overview
+﻿========================================================================
+    KONSOLENANWENDUNG: Blinker-Projektübersicht
 ========================================================================
 
-AppWizard has created this Blinker application for you.  
+Diese Blinker-Anwendung wurde vom Anwendungs-Assistenten 
+für Sie erstellt.
 
-This file contains a summary of what you will find in each of the files that
-make up your Blinker application.
+Die Datei enthält eine Zusammenfassung des Inhalts der Dateien,
+aus denen die Blinker-Anwendung besteht.
 
 
 Blinker.vcproj
-    This is the main project file for VC++ projects generated using an Application Wizard. 
-    It contains information about the version of Visual C++ that generated the file, and 
-    information about the platforms, configurations, and project features selected with the
-    Application Wizard.
+    Dies ist die Hauptprojektdatei für VC++-Projekte, die mit dem Anwendungs-
+    Assistenten generiert werden.
+    Sie enthält Informationen zu der Version von Visual C++, mit der die Datei 
+    generiert wurde, sowie Informationen zu Plattformen, Konfigurationen und 
+    Projektfeatures, die mit dem dem Anwendungs-Assistenten generiert werden.
 
 Blinker.cpp
-    This is the main application source file.
+    Dies ist die Hauptquelldatei der Anwendung.
 
 /////////////////////////////////////////////////////////////////////////////
-Other standard files:
+Andere Standarddateien:
 
 StdAfx.h, StdAfx.cpp
-    These files are used to build a precompiled header (PCH) file
-    named Blinker.pch and a precompiled types file named StdAfx.obj.
+    Mit diesen Dateien werden eine vorkompilierte Headerdatei (PCH)
+    mit dem Namen Blinker.pch sowie eine vorkompilierte 
+    Typendatei mit dem Namen StdAfx.obj erstellt.
 
 /////////////////////////////////////////////////////////////////////////////
-Other notes:
+Weitere Hinweise:
 
-AppWizard uses "TODO:" comments to indicate parts of the source code you
-should add to or customize.
+Der Anwendungs-Assistent verwendet "TODO:"-Kommentare, um die Teile des 
+Quellcodes anzugeben, die hinzugefügt oder bearbeitet werden müssen.
 
 /////////////////////////////////////////////////////////////////////////////

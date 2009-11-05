@@ -14,13 +14,6 @@ CWindow::CWindow(int x, int y, int w, int h) : Fl_Widget(x, y, w, h, NULL) {
 	dImage = NULL;
 }
 
-CWindow::~CWindow() {
-	if(image)
-		cvReleaseImage(&image);
-	if(dImage)
-		cvReleaseImage(&dImage);
-}
-
 void CWindow::setImage(IplImage* nImage) {
 	if (image)
 		cvReleaseImage(&image);
@@ -63,4 +56,3 @@ void CWindow::draw() {
 		fl_draw_image( (uchar *)image->imageData, getX(), getY(), image->width, image->height, image->nChannels , 0 );
 	fl_pop_clip();
 }
-
