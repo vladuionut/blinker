@@ -1,8 +1,8 @@
-// stdafx.cpp : source file that includes just the standard includes
-// Blinker.pch will be the pre-compiled header
-// stdafx.obj will contain the pre-compiled type information
+// stdafx.cpp : Quelldatei, die nur die Standard-Includes einbindet.
+// Blinker.pch ist der vorkompilierte Header.
+// stdafx.obj enthält die vorkompilierten Typinformationen.
 
 #include "stdafx.h"
 
-// TODO: reference any additional headers you need in STDAFX.H
-// and not in this file
+// TODO: Auf zusätzliche Header verweisen, die in STDAFX.H
+// und nicht in dieser Datei erforderlich sind.

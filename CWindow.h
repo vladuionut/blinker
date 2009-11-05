@@ -15,7 +15,6 @@ public:
 	int getY() {return _y;};
 	int getW() {return _w;};
 	int getH() {return _h;};
-	~CWindow();
 
 private:
 	int _x, _y, _w, _h;
