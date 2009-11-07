@@ -11,157 +11,6 @@
 #include "Blinker.h"
 
 /*
-	Statische Methode, die nach Druecken von cam_opener das Aufrufen der Methode openCam durchfuehrt.
-*/
-void Blinker::openCam_stat(Fl_Widget* wid, void* v) {
-	((Blinker*)v)->openCam();
-}
-/*
-	Bei bestehendem Verbindungsaufbau zur Webcam und Ausspielen von Videodaten wird ueber 
-	die Callbackmethode openCam_CB Videomaterial im Container scroll ausgegeben.
-*/
-void Blinker::openCam(){
-	if( loadHaarClassifier() ) {
-	openCam_CB();
-	scroll->redraw();
-	}
-}
-
-/*
-	Statische Methode, die den Aufruf fuer einen Timeout Callback 
-	der Callback-Methode play_CB ermoeglicht.
-*/
-void Blinker::play_CB_stat(void* v){
-	((Blinker*)v)->play_CB();
-}
-
-/*
-	Wird alle 0.01 Sekunden aufgerufen um ein neues Bild des Videostroms
-	zu holen und auszugeben.
-*/
-void Blinker::play_CB(){
-	if(flag_play==false) 
-		return;
-	frame=cap.GetFrame();
-	
-	/// detect face and eyes
-	detect();
-
-	pic->SetImage(frame);
-	scroll->redraw();
-	Fl::wait(0);
-
-	Fl::add_timeout(0.01, (Fl_Timeout_Handler)play_CB_stat, this);
-}
-
-void Blinker::detect(){
-	CvRect* rect = (CvRect*)0;
-	rect = detectFaces();
-	detectEyes(rect);
-	//frame = face->performDetection( frame );
-}
-
-CvRect* Blinker::detectFaces(){
-
-	CvRect* rect = (CvRect*)0;
-	IplImage* temp = (IplImage*)0;
-	CvSeq* faces = (CvSeq*)0;
-	if(frame && cascade_face) {
-		if(storage)cvClearMemStorage( storage );
-		temp = cvCreateImage( cvSize(frame->width,frame->height), 8, 3 );
-		
-		faces = cvHaarDetectObjects( frame, cascade_face, storage, 1.2, 2, 
-									 CV_HAAR_DO_CANNY_PRUNING, cvSize(30, 30) );
-
-		for ( int i = 0; i < (faces ? faces->total : 0); i++) {
-			rect = (CvRect*)cvGetSeqElem( faces, i );
-			cvRectangle( frame, cvPoint(rect->x,rect->y),
-						 cvPoint((rect->x+rect->width),
-								 (rect->y+rect->height)),
-						 CV_RGB(255,0,0), 3 );
-
-			cvRectangle( frame, 
-						 cvPoint(rect->x,rect->y+rect->height/5),
-						 cvPoint((rect->x+rect->width),
-								 (rect->y+rect->height/2)),
-						 CV_RGB(0,255,0), 3 );
-		}
-		if(temp)cvReleaseImage( &temp );
-		if(storage)cvClearMemStorage( storage );
-	}
-
-	return rect;
-}
-
-void Blinker::detectEyes(CvRect* rect) {
-
-	IplImage* temp = (IplImage*)0;
-	
-	if(frame && cascade_eye && rect) {
-		if(storage)cvClearMemStorage( storage );
-		temp = cvCreateImage( cvSize(frame->width,frame->height), 8, 3 );
-		cvSetImageROI( frame, cvRect(rect->x, rect->y+rect->height/5, rect->width, rect->height/3) );
-		CvSeq* eyes = cvHaarDetectObjects( frame, cascade_eye, storage, 1.2, 2, 
-										   CV_HAAR_DO_CANNY_PRUNING, cvSize(30, 30) );
-
-		if(eyes->total) {
-			for ( int i = 0; i < (eyes ? eyes->total : 0); i++) {
-				rect = (CvRect*)cvGetSeqElem( eyes, i );
-				cvRectangle( frame, cvPoint(rect->x,rect->y),
-							 cvPoint((rect->x+rect->width),(rect->y+rect->height)),
-							 CV_RGB(255,0,0), 3 );
-
-			}
-		}
-
-		if(storage)cvReleaseMemStorage( &storage );
-		if(temp)cvReleaseImage( &temp );
-		if(frame)cvResetImageROI( frame );
-	}
-}
-
-bool Blinker::loadHaarClassifier(){
-	if(cascade_face != ((CvHaarClassifierCascade*) 0) )
-		cvReleaseHaarClassifierCascade(&cascade_face);
-	if(cascade_eye != ((CvHaarClassifierCascade*) 0))
-		cvReleaseHaarClassifierCascade(&cascade_eye);
-
-	cascade_face = (CvHaarClassifierCascade*)cvLoad( CASC_FACE, 0, 0, 0 );
-	cascade_eye = (CvHaarClassifierCascade*)cvLoad( CASC_EYE, 0, 0, 0 );
-
-	if ( !cascade_face  ) {
-		fl_alert( "Error: Could not load cascade face classifier!" );
-		return false;
-	}
-
-	if ( !cascade_eye ) {
-		fl_alert( "Error: Could not load cascade eye classifier!" );
-		return false;
-	}
-
-	storage = cvCreateMemStorage(0);
-	return true;
-}
-
-/*
-	Callbackmethode fuer den Verbindungsaufbau zur Webcam und Ausspielen der Videodaten 
-	wird von openCam aufgerufen. Knopft cam_opener wird deaktiviert.
-*/
-void Blinker::openCam_CB(){
-	try {
-		if(!cap.CaptureFromCAM(0)) // Default -1
-			return;
-		pic->SetImage(cap.GetFrame());
-		scroll->redraw();
-		flag_play=true;
-		Fl::add_timeout(0.05, (Fl_Timeout_Handler)play_CB_stat, this);
-		cam_opener->deactivate();
-	} catch(exception &ex){
-		cerr << ex.what() << endl;
-	}
-}
-
-/*
 	Constructor.
 */
 Blinker::Blinker(int width = 700, int height =400, const char* title = "Blinker"):Fl_Double_Window(width,height,title){
@@ -170,12 +19,7 @@ Blinker::Blinker(int width = 700, int height =400, const char* title = "Blinker"
 	cam_opener = (Fl_Button*)0;
 	pic = (Fl_OpenCV*)0;
 	frame = (IplImage*)0;
-	cascade_face = (CvHaarClassifierCascade*)0;
-	cascade_eye = (CvHaarClassifierCascade*)0;
-	storage = (CvMemStorage*)0;
-	faces = (CvSeq*)0;
-
-	face = new CFace();
+	detector = new Detection();
 }
 
 /*
@@ -217,6 +61,70 @@ void Blinker::creatWin(){
 	} catch(exception &ex){
 		cerr << ex.what() << endl;
 	}
+}
+
+/*
+	Statische Methode, die nach Druecken von cam_opener das Aufrufen der Methode openCam durchfuehrt.
+*/
+void Blinker::openCam_stat(Fl_Widget* wid, void* v) {
+	((Blinker*)v)->openCam();
+}
+/*
+	Bei bestehendem Verbindungsaufbau zur Webcam und Ausspielen von Videodaten wird ueber 
+	die Callbackmethode openCam_CB Videomaterial im Container scroll ausgegeben.
+*/
+void Blinker::openCam(){
+		openCam_CB();
+		scroll->redraw();
+}
+
+/*
+	Callbackmethode fuer den Verbindungsaufbau zur Webcam und Ausspielen der Videodaten 
+	wird von openCam aufgerufen. Knopft cam_opener wird deaktiviert.
+*/
+void Blinker::openCam_CB(){
+	try {
+		if(!cap.CaptureFromCAM(0)) // Default -1
+			return;
+		pic->SetImage(cap.GetFrame());
+		scroll->redraw();
+		flag_play=true;
+		Fl::add_timeout(0.05, (Fl_Timeout_Handler)play_CB_stat, this);
+		cam_opener->deactivate();
+	} catch(exception &ex){
+		cerr << ex.what() << endl;
+	}
+}
+
+/*
+	Statische Methode, die den Aufruf fuer einen Timeout Callback 
+	der Callback-Methode play_CB ermoeglicht.
+*/
+void Blinker::play_CB_stat(void* v){
+	((Blinker*)v)->play_CB();
+}
+
+/*
+	Wird alle 0.01 Sekunden aufgerufen um ein neues Bild des Videostroms
+	zu holen und auszugeben.
+*/
+void Blinker::play_CB(){
+	if(flag_play==false) 
+		return;
+	frame=cap.GetFrame();
+	
+	
+	detect(); // detect face and eyes
+
+	pic->SetImage(frame);
+	scroll->redraw();
+	Fl::wait(0);
+
+	Fl::add_timeout(0.01, (Fl_Timeout_Handler)play_CB_stat, this);
+}
+
+void Blinker::detect(){
+	frame = detector->detectVideo( frame );
 }
 
 /*

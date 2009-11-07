@@ -1,7 +1,4 @@
-#include "stdafx.h"
 
-#include <iostream>
-using namespace std;
 /************************************************************************
    Technische Univeristaet Wien - 
    188.469 Visual Analysis of Human Motion (LU 1,0) 2009W
@@ -11,7 +8,10 @@ using namespace std;
 		 Agnieszka Wojdecka
 ************************************************************************/
 
-#include "CFace.h"
+#include "stdafx.h"
+
+#include <iostream>
+using namespace std;
 
 #include <string>
 #include <algorithm>
@@ -23,6 +23,7 @@ using namespace std;
 #include <highgui.h>
 #include <cvaux.h>
 
+#include "Detection.h"
 #include "Fl_OpenCV.h"
 
 #include <FL/Fl.H>
@@ -45,9 +46,6 @@ using namespace std;
 * e-mail: a0501682@unet.univie.ac.at
 **************************************************************/
 
-#define CASC_FACE "haarcascade_face.xml" // fuer release stat der Klasse Blinker
-#define CASC_EYE "haarcascade_eye.xml"
-
 class Blinker:public Fl_Double_Window{
 	public:
 
@@ -65,6 +63,18 @@ class Blinker:public Fl_Double_Window{
 		void creatWin();
 
 	protected:
+		/*
+			Detektor dessen Klasse Augen- und Gesichtsbereiche
+			detektieren kann.
+		*/
+		Detection* detector;
+
+		/*
+			Diese Methode führt eine Gesicht- und Augendetektion
+			durch. Die detektierten Bereiche werden im Video durch
+			eingefärbte Rechtecke gekennzeichnet.
+		*/
+		void detect();
 
 	private:
 		/*
@@ -73,16 +83,17 @@ class Blinker:public Fl_Double_Window{
 			Frames ausgespielt werden koennen.
 		*/
 		bool flag_play;
-		/*
-			Dieses Flag wird auf true gesetzt, wenn eine Gesichtsextraction 
-			durchgefuehrt wird.
-		*/
-		bool flag_faceExtract;
-		/*
-			Dieses Flag wird auf true gesetzt, wenn eine Augenextraction 
-			durchgefuehrt wird.
-		*/
-		bool flag_eyeExtract;
+
+		///*
+		//	Dieses Flag wird auf true gesetzt, wenn eine Gesichtsextraction 
+		//	durchgefuehrt wird.
+		//*/
+		//bool flag_faceExtract;
+		///*
+		//	Dieses Flag wird auf true gesetzt, wenn eine Augenextraction 
+		//	durchgefuehrt wird.
+		//*/
+		//bool flag_eyeExtract;
 		/*
 			Uebersteigt der Inhalt die Dimensionen des Fensters,
 			wird das ordnungsgerechte Betrachten des Inhalts ueber
@@ -93,18 +104,7 @@ class Blinker:public Fl_Double_Window{
 			Button, dessen Druecken einen Verbindungsaufbau zu einer
 			bestehenden Webcam ausloest.
 		*/
-		Fl_Button* cam_opener;
-		CvMemStorage* storage;
-		CvSeq* faces;
-		CFace* face;
-		CvHaarClassifierCascade* cascade_face;
-		CvHaarClassifierCascade* cascade_eye;
-
-		CvRect* detectFaces();
-		bool loadHaarClassifier();
-		void detectEyes(CvRect* rect);
-		void detect();
-		
+		Fl_Button* cam_opener;		
 
 		/*
 			Container fuer die Wiedergabe des Videomaterials. 
