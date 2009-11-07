@@ -8,8 +8,8 @@ CFace::CFace() {
 	cascade_face		= 0;
 	cascade_eye			= 0;
 	storage				= 0;
-	cascade_face_name	= "F:\\Studium\\9.Semester WS 09\\Visual Analysis of Human Motion\\Übung\\Blinker\\Blinker\\haarcascade_face.xml";
-	cascade_eye_name	= "F:\\Studium\\9.Semester WS 09\\Visual Analysis of Human Motion\\Übung\\Blinker\\Blinker\\haarcascade_eye.xml";
+	cascade_face_name	= "haarcascade_face.xml";
+	cascade_eye_name	= "haarcascade_eye.xml";
 	rFace				= 0;
 	rEyeRight			= 0;
 	rEyeLeft			= 0;

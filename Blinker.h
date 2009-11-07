@@ -11,22 +11,20 @@ using namespace std;
 		 Agnieszka Wojdecka
 ************************************************************************/
 
+#include "CFace.h"
+
 #include <string>
 #include <algorithm>
 #include <sstream>
 #include <stdexcept>
 
-// OpenCV
 #include <cv.h>
 #include <cxcore.h>
 #include <highgui.h>
+#include <cvaux.h>
 
-// include
-#include "CWindow.h"
-#include "CWebcam.h"
-#include "CFace.h"
+#include "Fl_OpenCV.h"
 
-// FLTK
 #include <FL/Fl.H>
 #include <FL/Fl_Scroll.H>
 #include <FL/Fl_Double_Window.H>
@@ -34,7 +32,6 @@ using namespace std;
 #include <FL/Fl_Group.H>
 #include <FL/Fl_Scroll.H>
 #include <FL/Fl_Button.H>
-#include <FL/fl_ask.H>
 
 /************************************************************
 * Diese Klasse ermöglicht das Extrahieren von Kopf- und 
@@ -48,6 +45,9 @@ using namespace std;
 * e-mail: a0501682@unet.univie.ac.at
 **************************************************************/
 
+#define CASC_FACE "haarcascade_face.xml" // fuer release stat der Klasse Blinker
+#define CASC_EYE "haarcascade_eye.xml"
+
 class Blinker:public Fl_Double_Window{
 	public:
 
@@ -55,12 +55,10 @@ class Blinker:public Fl_Double_Window{
 			Constructor. Defaultwerte fuer Breite, 700, Hoehe, 400, Titel "Blinker".
 		*/
 		Blinker(int, int, const char*);
-
 		/*
 			Destructor.
 		*/
-		~Blinker();
-
+		//~Blinker();
 		/*
 			Diese Methode erzeugt die Fensterapplikation.  
 		*/
@@ -68,86 +66,78 @@ class Blinker:public Fl_Double_Window{
 
 	protected:
 
-	private:				
-		/*
-			Uebersteigt der Inhalt die Dimensionen des Fensters,
-			wird das ordnungsgerechte Betrachten des Inhalts ueber
-			Scroll-Balken ermoeglich.
-		*/
-		Fl_Scroll* scroll;
-
-		/*
-			Button, dessen Druecken einen Verbindungsaufbau zu einer
-			bestehenden Webcam ausloest.
-		*/
-		Fl_Button* cam_opener;
-
-		/*
-			Container fuer die Wiedergabe des Videomaterials. 
-			Ist eingebettet in scroll.
-		*/
-		CWindow* pic;
-
-		/*
-			Speichert bei Wiedergabe des Videos Bild fuer Bild.
-		*/
-		IplImage* frame;
-
-		/*
-			Ermoeglicht den Verbindugnsaufbau und das Zugreifen auf Daten einer Webcam.
-		*/
-		CWebcam cap;
-
+	private:
 		/*
 			Dieses Flag wird auf true gesetzt, wenn eine Verbindung 
 			zu einer Webcam aufgebaut werden konnte, und ueber diese
 			Frames ausgespielt werden koennen.
 		*/
 		bool flag_play;
-
+		/*
+			Dieses Flag wird auf true gesetzt, wenn eine Gesichtsextraction 
+			durchgefuehrt wird.
+		*/
+		bool flag_faceExtract;
+		/*
+			Dieses Flag wird auf true gesetzt, wenn eine Augenextraction 
+			durchgefuehrt wird.
+		*/
+		bool flag_eyeExtract;
+		/*
+			Uebersteigt der Inhalt die Dimensionen des Fensters,
+			wird das ordnungsgerechte Betrachten des Inhalts ueber
+			Scroll-Balken ermoeglich.
+		*/
+		Fl_Scroll* scroll;
+		/*
+			Button, dessen Druecken einen Verbindungsaufbau zu einer
+			bestehenden Webcam ausloest.
+		*/
+		Fl_Button* cam_opener;
 		CvMemStorage* storage;
-
-		CvHaarClassifierCascade* cascade_face;		
-
-		CvHaarClassifierCascade* cascade_eye;	
-
-		const char* cascade_face_name;
-
-		const char* cascade_eye_name;
-
-		bool load_classifiers;
-
-		bool loadHaarClassifier();
+		CvSeq* faces;
+		CFace* face;
+		CvHaarClassifierCascade* cascade_face;
+		CvHaarClassifierCascade* cascade_eye;
 
 		CvRect* detectFaces();
-
+		bool loadHaarClassifier();
 		void detectEyes(CvRect* rect);
+		void detect();
+		
 
-		CFace* face;
-
+		/*
+			Container fuer die Wiedergabe des Videomaterials. 
+			Ist eingebettet in scroll.
+		*/
+		Fl_OpenCV* pic;
+		/*
+			Speichert bei Wiedergabe des Videos Bild fuer Bild.
+		*/
+		IplImage* frame;
+		/*
+			Ermoeglicht den Verbindugnsaufbau und das Zugreifen auf Daten einer Webcam.
+		*/
+		Fl_Capture cap;
 		/*
 			Statische Methode, die nach Druecken von cam_opener das Aufrufen der Methode openCam durchfuehrt.
 		*/
 		static void openCam_stat(Fl_Widget*, void*);
-
 		/*
 			Bei bestehendem Verbindungsaufbau zur Webcam und Ausspielen von Videodaten wird ueber 
 			die Callbackmethode openCam_CB Videomaterial im Container scroll ausgegeben.
 		*/
 		void openCam();
-
 		/*
 			Callbackmethode fuer den Verbindungsaufbau zur Webcam und Ausspielen der Videodaten 
 			wird von openCam aufgerufen. Knopft cam_opener wird deaktiviert.
 		*/
 		void openCam_CB();
-
 		/*
 			Statische Methode, die den Aufruf fuer einen Timeout Callback 
 			der Callback-Methode play_CB ermoeglicht.
 		*/
 		static void play_CB_stat(void*);
-
 		/*
 			Wird alle 0.01 Sekunden aufgerufen um ein neues Bild des Videostroms
 			zu holen und auszugeben.
