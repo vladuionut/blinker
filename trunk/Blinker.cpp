@@ -10,7 +10,6 @@
 #include "stdafx.h"
 #include "Blinker.h"
 
-
 /*
 	Statische Methode, die nach Druecken von cam_opener das Aufrufen der Methode openCam durchfuehrt.
 */
@@ -22,9 +21,10 @@ void Blinker::openCam_stat(Fl_Widget* wid, void* v) {
 	die Callbackmethode openCam_CB Videomaterial im Container scroll ausgegeben.
 */
 void Blinker::openCam(){
-	load_classifiers = loadHaarClassifier();
+	if( loadHaarClassifier() ) {
 	openCam_CB();
 	scroll->redraw();
+	}
 }
 
 /*
@@ -40,79 +40,94 @@ void Blinker::play_CB_stat(void* v){
 	zu holen und auszugeben.
 */
 void Blinker::play_CB(){
-	CvRect* rect = 0;
-
-	if(flag_play == false) 
+	if(flag_play==false) 
 		return;
-	frame = cap.getFrame();
+	frame=cap.GetFrame();
+	
+	/// detect face and eyes
+	detect();
 
-	// detect face and eyes
-	/*rect = detectFaces();
-	detectEyes(rect);*/
-	frame = face->performDetection( frame );
-
-	pic->setImage(frame);
+	pic->SetImage(frame);
 	scroll->redraw();
 	Fl::wait(0);
 
 	Fl::add_timeout(0.01, (Fl_Timeout_Handler)play_CB_stat, this);
 }
 
-/*
-	Callbackmethode fuer den Verbindungsaufbau zur Webcam und Ausspielen der Videodaten 
-	wird von openCam aufgerufen. Knopft cam_opener wird deaktiviert.
-*/
-void Blinker::openCam_CB(){
-	try {
-		cap.captureFromCamera(0);
-		pic->setImage(cap.getFrame());
-		scroll->redraw();
-		flag_play = true;
-		Fl::add_timeout(0.05, (Fl_Timeout_Handler)play_CB_stat, this);
-		cam_opener->deactivate();
-	} catch(exception &ex){
-		cerr << ex.what() << endl;
+void Blinker::detect(){
+	CvRect* rect = (CvRect*)0;
+	rect = detectFaces();
+	detectEyes(rect);
+	//frame = face->performDetection( frame );
+}
+
+CvRect* Blinker::detectFaces(){
+
+	CvRect* rect = (CvRect*)0;
+	IplImage* temp = (IplImage*)0;
+	CvSeq* faces = (CvSeq*)0;
+	if(frame && cascade_face) {
+		if(storage)cvClearMemStorage( storage );
+		temp = cvCreateImage( cvSize(frame->width,frame->height), 8, 3 );
+		
+		faces = cvHaarDetectObjects( frame, cascade_face, storage, 1.2, 2, 
+									 CV_HAAR_DO_CANNY_PRUNING, cvSize(30, 30) );
+
+		for ( int i = 0; i < (faces ? faces->total : 0); i++) {
+			rect = (CvRect*)cvGetSeqElem( faces, i );
+			cvRectangle( frame, cvPoint(rect->x,rect->y),
+						 cvPoint((rect->x+rect->width),
+								 (rect->y+rect->height)),
+						 CV_RGB(255,0,0), 3 );
+
+			cvRectangle( frame, 
+						 cvPoint(rect->x,rect->y+rect->height/5),
+						 cvPoint((rect->x+rect->width),
+								 (rect->y+rect->height/2)),
+						 CV_RGB(0,255,0), 3 );
+		}
+		if(temp)cvReleaseImage( &temp );
+		if(storage)cvClearMemStorage( storage );
+	}
+
+	return rect;
+}
+
+void Blinker::detectEyes(CvRect* rect) {
+
+	IplImage* temp = (IplImage*)0;
+	
+	if(frame && cascade_eye && rect) {
+		if(storage)cvClearMemStorage( storage );
+		temp = cvCreateImage( cvSize(frame->width,frame->height), 8, 3 );
+		cvSetImageROI( frame, cvRect(rect->x, rect->y+rect->height/5, rect->width, rect->height/3) );
+		CvSeq* eyes = cvHaarDetectObjects( frame, cascade_eye, storage, 1.2, 2, 
+										   CV_HAAR_DO_CANNY_PRUNING, cvSize(30, 30) );
+
+		if(eyes->total) {
+			for ( int i = 0; i < (eyes ? eyes->total : 0); i++) {
+				rect = (CvRect*)cvGetSeqElem( eyes, i );
+				cvRectangle( frame, cvPoint(rect->x,rect->y),
+							 cvPoint((rect->x+rect->width),(rect->y+rect->height)),
+							 CV_RGB(255,0,0), 3 );
+
+			}
+		}
+
+		if(storage)cvReleaseMemStorage( &storage );
+		if(temp)cvReleaseImage( &temp );
+		if(frame)cvResetImageROI( frame );
 	}
 }
 
-/*
-	Constructor.
-*/
-Blinker::Blinker(int width = 700, int height =400, const char* title = "Blinker"):Fl_Double_Window(width,height,title){
-	flag_play			= false;
-	load_classifiers	= false;
-	scroll				= (Fl_Scroll*)0;
-	cam_opener			= (Fl_Button*)0;
-	pic					= (CWindow*)0;
-	frame				= (IplImage*)0;
+bool Blinker::loadHaarClassifier(){
+	if(cascade_face != ((CvHaarClassifierCascade*) 0) )
+		cvReleaseHaarClassifierCascade(&cascade_face);
+	if(cascade_eye != ((CvHaarClassifierCascade*) 0))
+		cvReleaseHaarClassifierCascade(&cascade_eye);
 
-	cascade_face		= 0;
-	cascade_eye			= 0;
-	storage				= 0;
-	cascade_face_name	= "F:\\Studium\\9.Semester WS 09\\Visual Analysis of Human Motion\\Übung\\Blinker\\Blinker\\haarcascade_face.xml";
-	cascade_eye_name	= "F:\\Studium\\9.Semester WS 09\\Visual Analysis of Human Motion\\Übung\\Blinker\\Blinker\\haarcascade_eye.xml";
-
-	face = new CFace();
-}
-
-/*
-	Destructor.
-*/
-Blinker::~Blinker(){
-	if(frame)
-		cvReleaseImage(&frame);
-
-	delete face;
-}
-
-bool Blinker::loadHaarClassifier() {
-	if (cascade_face)
-		cvReleaseHaarClassifierCascade( &cascade_face );
-	if (cascade_eye)
-		cvReleaseHaarClassifierCascade( &cascade_eye );
-
-	cascade_face = (CvHaarClassifierCascade*) cvLoad( cascade_face_name, 0, 0, 0);
-	cascade_eye  = (CvHaarClassifierCascade*) cvLoad( cascade_eye_name, 0, 0, 0);
+	cascade_face = (CvHaarClassifierCascade*)cvLoad( CASC_FACE, 0, 0, 0 );
+	cascade_eye = (CvHaarClassifierCascade*)cvLoad( CASC_EYE, 0, 0, 0 );
 
 	if ( !cascade_face  ) {
 		fl_alert( "Error: Could not load cascade face classifier!" );
@@ -124,72 +139,66 @@ bool Blinker::loadHaarClassifier() {
 		return false;
 	}
 
+	storage = cvCreateMemStorage(0);
 	return true;
 }
 
-CvRect* Blinker::detectFaces() {
-	CvRect* rect = 0;
-	IplImage* temp = cvCreateImage( cvSize(frame->width,frame->height), 8, 3 );
-	storage = cvCreateMemStorage(0);
-	cvClearMemStorage( storage );
-	CvSeq* faces = cvHaarDetectObjects( frame, cascade_face, storage, 1.2, 2, CV_HAAR_DO_CANNY_PRUNING, cvSize(30, 30) );
-
-	for ( int i = 0; i < (faces ? faces->total : 0); i++) {
-		rect = (CvRect*)cvGetSeqElem( faces, i );
-		cvRectangle( frame, cvPoint(rect->x,rect->y),
-                     cvPoint((rect->x+rect->width),
-                             (rect->y+rect->height)),
-                     CV_RGB(255,0,0), 3 );
-
-		cvRectangle( frame, 
-			         cvPoint(rect->x,rect->y+rect->height/5),
-                     cvPoint((rect->x+rect->width),
-                             (rect->y+rect->height/2)),
-                     CV_RGB(0,255,0), 3 );
+/*
+	Callbackmethode fuer den Verbindungsaufbau zur Webcam und Ausspielen der Videodaten 
+	wird von openCam aufgerufen. Knopft cam_opener wird deaktiviert.
+*/
+void Blinker::openCam_CB(){
+	try {
+		if(!cap.CaptureFromCAM(0)) // Default -1
+			return;
+		pic->SetImage(cap.GetFrame());
+		scroll->redraw();
+		flag_play=true;
+		Fl::add_timeout(0.05, (Fl_Timeout_Handler)play_CB_stat, this);
+		cam_opener->deactivate();
+	} catch(exception &ex){
+		cerr << ex.what() << endl;
 	}
-
-	cvReleaseImage( &temp );
-	cvClearMemStorage( storage );
-
-	return rect;
 }
 
-void Blinker::detectEyes(CvRect* rect) {
-	if ( !rect )
-		return;
+/*
+	Constructor.
+*/
+Blinker::Blinker(int width = 700, int height =400, const char* title = "Blinker"):Fl_Double_Window(width,height,title){
+	flag_play = false;
+	scroll = (Fl_Scroll*)0;
+	cam_opener = (Fl_Button*)0;
+	pic = (Fl_OpenCV*)0;
+	frame = (IplImage*)0;
+	cascade_face = (CvHaarClassifierCascade*)0;
+	cascade_eye = (CvHaarClassifierCascade*)0;
+	storage = (CvMemStorage*)0;
+	faces = (CvSeq*)0;
 
-	IplImage* temp = cvCreateImage( cvSize(frame->width,frame->height), 8, 3 );
-	storage = cvCreateMemStorage(0);
-	cvClearMemStorage( storage );
-	cvSetImageROI( frame, cvRect(rect->x, rect->y+rect->height/5, rect->width, rect->height/3) );
-	CvSeq* eyes = cvHaarDetectObjects( frame, cascade_eye, storage, 1.2, 2, CV_HAAR_DO_CANNY_PRUNING, cvSize(30, 30) );
-
-	for ( int i = 0; i < (eyes ? eyes->total : 0); i++) {
-		rect = (CvRect*)cvGetSeqElem( eyes, i );
-		cvRectangle( frame, cvPoint(rect->x,rect->y),
-                     cvPoint((rect->x+rect->width),(rect->y+rect->height)),
-                     CV_RGB(255,0,0), 3 );
-
-	}
-
-	cvReleaseMemStorage( &storage );
-	cvReleaseImage( &temp );
-	cvResetImageROI( frame );
+	face = new CFace();
 }
+
+/*
+	Destructor.
+*/
+//Blinker::~Blinker(){
+//}
 
 /*
 	Diese Methode erzeugt die Fensterapplikation.  
 */
 void Blinker::creatWin(){
 	try {
+
 		this->color((Fl_Color)31);
 		this->begin();
 		{
 			scroll = new Fl_Scroll(5, 10, 330, 250);
 			scroll->box(FL_EMBOSSED_FRAME);
 			scroll->color((Fl_Color)23);
-			pic = new CWindow(10,15,320,240);
+			pic = new Fl_OpenCV(10,15,320,240);
 			scroll->add(pic);
+			pic->FitWindows();
 			scroll->end();
 		}
 		{
@@ -202,6 +211,7 @@ void Blinker::creatWin(){
 		}
 
 		this->end();
+		this->resizable(this);
 		this->show();
 
 	} catch(exception &ex){
