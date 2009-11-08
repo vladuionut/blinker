@@ -10,7 +10,7 @@
 #include <FL/fl_ask.H>
 
 // others
-#include "CVector.h"
+#include "NearestDetection.h"
 
 #define CASC_FACE "haarcascade_face.xml" // fuer release stat der Klasse Blinker
 #define CASC_EYE "haarcascade_eye.xml"
@@ -19,7 +19,7 @@ class Detection {
 
 public:
 	Detection();
-	//~Detection();
+	~Detection();
 
 	/*
 		Detektiert zunaecht den Gesichtsbereich, aufbauend auf diesem
@@ -31,6 +31,11 @@ public:
 protected:
 	const char* cascade_face_name;
 	const char* cascade_eye_name;
+
+	CvRect* rFace;
+	CvRect* rEyeRight;
+	CvRect* rEyeLeft;
+	NearestDetection* prevDetection;
 
 private:
 	CvMemStorage* storage;
