@@ -9,11 +9,23 @@ Detection::Detection() {
 	cascade_face		= (CvHaarClassifierCascade*)0;
 	cascade_eye			= (CvHaarClassifierCascade*)0;
 	storage				= (CvMemStorage*)0;
+	prevDetection		=  new NearestDetection();
+	rFace				=  new CvRect();
+	rEyeRight			=  new CvRect();
+	rEyeLeft			=  new CvRect();
 	loadHaarClassifier();
 }
 
-//Detection::~Detection() {
-//}
+Detection::~Detection() {
+	delete prevDetection;
+	if(storage)cvClearMemStorage( storage );
+	delete rFace;
+	delete rEyeLeft;
+	delete rEyeRight;
+	/*delete cascade_face;
+	delete cascade_eye;*/
+ 
+}
 
 bool Detection::loadHaarClassifier() {
 	if(cascade_face != ((CvHaarClassifierCascade*) 0) )
@@ -52,20 +64,15 @@ IplImage* Detection::detectFace( IplImage* frame ) {
 		faces = cvHaarDetectObjects( frame, cascade_face, storage, 1.2, 2, 
 									 CV_HAAR_DO_CANNY_PRUNING, cvSize(30, 30) );
 
-		for ( int i = 0; i < (faces ? faces->total : 0); i++) { //so lange ein videostrom besteht
-			rect = (CvRect*)cvGetSeqElem( faces, i );
-			cvRectangle( frame, 
-						 cvPoint(rect->x,rect->y),
-						 cvPoint((rect->x+rect->width),
-								 (rect->y+rect->height)),
-						 CV_RGB(255,0,0), 3 ); // blue, rectangle for face
+		rFace = prevDetection->getNearestFace( faces );
 
+		if (rFace) {
 			cvRectangle( frame, 
-						 cvPoint(rect->x,rect->y+rect->height/5),
-						 cvPoint((rect->x+rect->width),
-								 (rect->y+rect->height/2)),
-						 CV_RGB(0,255,0), 3 ); // green, rectangle for eyearea
+						 cvPoint(rFace->x,rFace->y),
+						 cvPoint((rFace->x+rFace->width),(rFace->y+rFace->height)),
+						 CV_RGB(255,0,0), 3 );  // blue, rectangle for face
 		}
+
 		if(storage)cvClearMemStorage( storage );
 	}
 
@@ -74,28 +81,50 @@ IplImage* Detection::detectFace( IplImage* frame ) {
 
 IplImage* Detection::detectEyes( IplImage* frame ) {
 
-	CvRect* rect = (CvRect*)0;
-	CvSeq* eyes = (CvSeq*)0;
+	if (!rFace || !frame || !cascade_eye)
+		return frame;
 
-	if(frame && cascade_eye) {
+		vector<CvRect*> vEyes;
+		CvRect* rect;
 		if(storage)cvClearMemStorage( storage );
+		cvSetImageROI( frame, cvRect(rFace->x, rFace->y+rFace->height/5, 
+									 rFace->width, rFace->height/3) );
+		CvSeq* eyes = cvHaarDetectObjects( frame, cascade_eye, storage, 1.2, 2, 
+										   CV_HAAR_DO_CANNY_PRUNING, cvSize(30, 30) );
 
-		eyes = cvHaarDetectObjects( frame, cascade_eye, storage, 1.2, 2, 
-									 CV_HAAR_DO_CANNY_PRUNING, cvSize(30, 30) );
-
-		for ( int i = 0; i < (eyes ? eyes->total : 0); i++) { //so lange ein videostrom besteht
+		
+		for ( int i = 0; i < eyes->total; i++ ) {
 			rect = (CvRect*)cvGetSeqElem( eyes, i );
 			cvRectangle( frame, 
 						 cvPoint(rect->x,rect->y),
-						 cvPoint((rect->x+rect->width),
-								 (rect->y+rect->height)),
-						 CV_RGB(0,0,255), 3 ); // red, rectangle for eye
+						 cvPoint((rect->x+rect->width),(rect->y+rect->height)),
+						 CV_RGB(0,255,0), 3 );
 		}
+
+
+		vEyes = prevDetection->getNearestEyes( eyes, rFace );
+
+		
+		rEyeRight = vEyes.at(0);
+		rEyeLeft = vEyes.at(1);
+
+		if ( rEyeRight ) {
+			cvRectangle( frame, 
+						 cvPoint(rEyeRight->x,rEyeRight->y),
+						 cvPoint((rEyeRight->x+rEyeRight->width),(rEyeRight->y+rEyeRight->height)),
+						 CV_RGB(255,0,0), 3 );
+		}
+
+		if ( rEyeLeft ) {
+			cvRectangle( frame, 
+						 cvPoint(rEyeLeft->x,rEyeLeft->y),
+						 cvPoint((rEyeLeft->x+rEyeLeft->width),(rEyeLeft->y+rEyeLeft->height)),
+						 CV_RGB(255,0,0), 3 );
+		}
+
+
 		if(storage)cvClearMemStorage( storage );
-	}
+		if(frame)cvResetImageROI( frame );
 
-	return frame;
+		return frame;
 }
-
-
-

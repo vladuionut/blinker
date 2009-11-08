@@ -25,8 +25,11 @@ Blinker::Blinker(int width = 700, int height =400, const char* title = "Blinker"
 /*
 	Destructor.
 */
-//Blinker::~Blinker(){
-//}
+Blinker::~Blinker(){
+	delete detector;
+	delete scroll;
+	delete cam_opener;
+}
 
 /*
 	Diese Methode erzeugt die Fensterapplikation.  

@@ -56,7 +56,7 @@ class Blinker:public Fl_Double_Window{
 		/*
 			Destructor.
 		*/
-		//~Blinker();
+		~Blinker();
 		/*
 			Diese Methode erzeugt die Fensterapplikation.  
 		*/
