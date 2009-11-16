@@ -11,6 +11,7 @@
 
 // others
 #include "NearestDetection.h"
+#include "BlinkDetection.h"
 
 #define CASC_FACE "haarcascade_face.xml" // fuer release stat der Klasse Blinker
 #define CASC_EYE "haarcascade_eye.xml"
@@ -18,6 +19,9 @@
 class Detection {
 
 public:
+	CvRect* rFace;
+	vector<CvRect*> rEyes;
+
 	Detection();
 	~Detection();
 
@@ -28,16 +32,14 @@ public:
 	*/
 	IplImage* detectVideo(IplImage*); // statt performDetection
 	bool detectBlink(IplImage*);
+	bool detectBlink(IplImage*, vector<CvRect*>);
 
 protected:
 	const char* cascade_face_name;
 	const char* cascade_eye_name;
 
-	/*CvRect* rFace;
-	CvRect* rEyeRight;
-	CvRect* rEyeLeft;*/
 	NearestDetection* prevDetection;
-	//BlinkDetection* blinkDetector;
+	BlinkDetection* blinkDetector;
 
 private:
 	CvMemStorage* storage;

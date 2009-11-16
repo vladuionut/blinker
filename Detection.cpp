@@ -4,28 +4,40 @@
 #include <iostream>
 using namespace std;
 
-bool detectBlink(IplImage* img) { 
-
-	if(!img)
+bool Detection::detectBlink(IplImage* frame ) { 
+	if(!frame)
 		return false;
 
-	//blinkDetector;
+	return detectBlink( frame, 
+					    detectEyes(frame) );
+}
 
-	return true;
+bool Detection::detectBlink(IplImage* frame, vector<CvRect*> eyes) {
+	if(!frame|| eyes != (vector<CvRect*>)0)
+		return false;
+
+	// blinkDetector??
+
+	return false;
 }
 
 Detection::Detection() {
 	cascade_face		= (CvHaarClassifierCascade*)0;
 	cascade_eye			= (CvHaarClassifierCascade*)0;
 	storage				= (CvMemStorage*)0;
+	CvRect* rFace		= (CvRect*)0;
+	vector<CvRect*> rEyes = (vector<CvRect*>)0;
+
 	prevDetection		=  new NearestDetection();
-	//blinkDetector		= new BlinkDetection();
+	blinkDetector		= new BlinkDetection();
 	loadHaarClassifier();
 }
 
 Detection::~Detection() {
 	delete prevDetection;
 	if(storage)cvClearMemStorage( storage );
+	delete rFace;
+	rEyes.empty();
 	/*delete cascade_face;
 	delete cascade_eye;*/
  
@@ -54,6 +66,7 @@ bool Detection::loadHaarClassifier() {
 	return true;
 }
 
+
 IplImage* Detection::detectVideo(IplImage* frame) {
 	CvRect* face = detectFace( frame );
 	if (face) {
@@ -61,7 +74,11 @@ IplImage* Detection::detectVideo(IplImage* frame) {
 					 cvPoint(face->x,face->y),
 					 cvPoint((face->x+face->width),(face->y+face->height)),
 					 CV_RGB(255,0,0), 3 );  // blue, rectangle for face
+
+		rFace = face;
 	}
+	
+
 	vector<CvRect*> eyes = detectEyes( frame, face );
 	if(eyes != (vector<CvRect*>)0) {
 		if ( eyes.at(0) ) {
@@ -77,6 +94,8 @@ IplImage* Detection::detectVideo(IplImage* frame) {
 						 cvPoint((eyes.at(1)->x+eyes.at(1)->width),(eyes.at(1)->y+eyes.at(1)->height)),
 						 CV_RGB(255,0,0), 3 );
 		}
+
+		rEyes = eyes;
 	}
 
 	if(storage)cvClearMemStorage( storage );
