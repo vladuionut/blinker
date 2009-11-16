@@ -13,15 +13,14 @@ bool Detection::detectBlink(IplImage* frame ) {
 }
 
 bool Detection::detectBlink(IplImage* frame, vector<CvRect*> eyes) {
-	if(!frame|| eyes != (vector<CvRect*>)0)
+	if(!frame|| eyes != (vector<CvRect*>)0 )
 		return false;
 
-	// blinkDetector??
-
-	return false;
+	return blinkDetector->detect( frame, eyes );
 }
 
 Detection::Detection() {
+	temp				= (vector<IplImage*>)0;
 	cascade_face		= (CvHaarClassifierCascade*)0;
 	cascade_eye			= (CvHaarClassifierCascade*)0;
 	storage				= (CvMemStorage*)0;
@@ -35,9 +34,12 @@ Detection::Detection() {
 
 Detection::~Detection() {
 	delete prevDetection;
+	delete blinkDetector;
+
 	if(storage)cvClearMemStorage( storage );
 	delete rFace;
-	rEyes.empty();
+	if(rEyes != (vector<CvRect*>)0)rEyes.empty();
+	if(temp != (vector<IplImage*>)0)temp.empty();
 	/*delete cascade_face;
 	delete cascade_eye;*/
  
