@@ -128,7 +128,8 @@ void Blinker::play_CB(){
 
 void Blinker::detect(){
 	frame = detector->detectVideo( frame );
-	//detector->detectBlink(frame);
+	if( detector->detectBlink( frame, detector->rEyes ) )
+		cout << "Blink!";
 }
 
 /*
