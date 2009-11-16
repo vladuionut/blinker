@@ -4,24 +4,28 @@
 #include <iostream>
 using namespace std;
 
+bool detectBlink(IplImage* img) { 
+
+	if(!img)
+		return false;
+
+	//blinkDetector;
+
+	return true;
+}
 
 Detection::Detection() {
 	cascade_face		= (CvHaarClassifierCascade*)0;
 	cascade_eye			= (CvHaarClassifierCascade*)0;
 	storage				= (CvMemStorage*)0;
 	prevDetection		=  new NearestDetection();
-	rFace				=  new CvRect();
-	rEyeRight			=  new CvRect();
-	rEyeLeft			=  new CvRect();
+	//blinkDetector		= new BlinkDetection();
 	loadHaarClassifier();
 }
 
 Detection::~Detection() {
 	delete prevDetection;
 	if(storage)cvClearMemStorage( storage );
-	delete rFace;
-	delete rEyeLeft;
-	delete rEyeRight;
 	/*delete cascade_face;
 	delete cascade_eye;*/
  
@@ -51,10 +55,37 @@ bool Detection::loadHaarClassifier() {
 }
 
 IplImage* Detection::detectVideo(IplImage* frame) {
-	return detectEyes( detectFace( frame ) );
+	CvRect* face = detectFace( frame );
+	if (face) {
+		cvRectangle( frame, 
+					 cvPoint(face->x,face->y),
+					 cvPoint((face->x+face->width),(face->y+face->height)),
+					 CV_RGB(255,0,0), 3 );  // blue, rectangle for face
+	}
+	vector<CvRect*> eyes = detectEyes( frame, face );
+	if(eyes != (vector<CvRect*>)0) {
+		if ( eyes.at(0) ) {
+			cvRectangle( frame, 
+						 cvPoint(eyes.at(0)->x,eyes.at(0)->y),
+						 cvPoint((eyes.at(0)->x+eyes.at(0)->width),(eyes.at(0)->y+eyes.at(0)->height)),
+						 CV_RGB(255,0,0), 3 );
+		}
+
+		if (  eyes.at(1) ) {
+			cvRectangle( frame, 
+						 cvPoint(eyes.at(1)->x,eyes.at(1)->y),
+						 cvPoint((eyes.at(1)->x+eyes.at(1)->width),(eyes.at(1)->y+eyes.at(1)->height)),
+						 CV_RGB(255,0,0), 3 );
+		}
+	}
+
+	if(storage)cvClearMemStorage( storage );
+
+	return frame;
 }
 
-IplImage* Detection::detectFace( IplImage* frame ) {
+CvRect* Detection::detectFace( IplImage* frame ) {
+	CvRect* rFace = (CvRect*)0;
 	CvRect* rect = (CvRect*)0;
 	CvSeq* faces = (CvSeq*)0;
 
@@ -65,66 +96,45 @@ IplImage* Detection::detectFace( IplImage* frame ) {
 									 CV_HAAR_DO_CANNY_PRUNING, cvSize(30, 30) );
 
 		rFace = prevDetection->getNearestFace( faces );
-
-		if (rFace) {
-			cvRectangle( frame, 
-						 cvPoint(rFace->x,rFace->y),
-						 cvPoint((rFace->x+rFace->width),(rFace->y+rFace->height)),
-						 CV_RGB(255,0,0), 3 );  // blue, rectangle for face
-		}
-
-		if(storage)cvClearMemStorage( storage );
 	}
 
-	return frame;
+	return rFace;
 }
 
-IplImage* Detection::detectEyes( IplImage* frame ) {
+vector<CvRect*> Detection::detectEyes( IplImage* frame, CvRect* rFace ) {
 
-	if (!rFace || !frame || !cascade_eye)
-		return frame;
+	vector<CvRect*> vEyes = (vector<CvRect*>)0;
 
-		vector<CvRect*> vEyes;
-		CvRect* rect;
-		if(storage)cvClearMemStorage( storage );
-		cvSetImageROI( frame, cvRect(rFace->x, rFace->y+rFace->height/5, 
-									 rFace->width, rFace->height/3) );
-		CvSeq* eyes = cvHaarDetectObjects( frame, cascade_eye, storage, 1.2, 2, 
-										   CV_HAAR_DO_CANNY_PRUNING, cvSize(30, 30) );
-
+	if ( !frame || !cascade_eye || !rFace)
+		return vEyes;
 		
-		for ( int i = 0; i < eyes->total; i++ ) {
-			rect = (CvRect*)cvGetSeqElem( eyes, i );
-			cvRectangle( frame, 
-						 cvPoint(rect->x,rect->y),
-						 cvPoint((rect->x+rect->width),(rect->y+rect->height)),
-						 CV_RGB(0,255,0), 3 );
-		}
+	CvRect* rect;
+	if(storage)cvClearMemStorage( storage );
+	cvSetImageROI( frame, cvRect(rFace->x, rFace->y+rFace->height/5, 
+								 rFace->width, rFace->height/3) );
+	CvSeq* eyes = cvHaarDetectObjects( frame, cascade_eye, storage, 1.2, 2, 
+									   CV_HAAR_DO_CANNY_PRUNING, cvSize(30, 30) );
+
+	
+	for ( int i = 0; i < eyes->total; i++ ) {
+		rect = (CvRect*)cvGetSeqElem( eyes, i );
+		cvRectangle( frame, 
+					 cvPoint(rect->x,rect->y),
+					 cvPoint((rect->x+rect->width),(rect->y+rect->height)),
+					 CV_RGB(0,255,0), 3 );
+	}
 
 
-		vEyes = prevDetection->getNearestEyes( eyes, rFace );
+	vEyes = prevDetection->getNearestEyes( eyes, rFace );
 
-		
-		rEyeRight = vEyes.at(0);
-		rEyeLeft = vEyes.at(1);
+	if(frame)cvResetImageROI( frame );
 
-		if ( rEyeRight ) {
-			cvRectangle( frame, 
-						 cvPoint(rEyeRight->x,rEyeRight->y),
-						 cvPoint((rEyeRight->x+rEyeRight->width),(rEyeRight->y+rEyeRight->height)),
-						 CV_RGB(255,0,0), 3 );
-		}
+	return vEyes;
+}
 
-		if ( rEyeLeft ) {
-			cvRectangle( frame, 
-						 cvPoint(rEyeLeft->x,rEyeLeft->y),
-						 cvPoint((rEyeLeft->x+rEyeLeft->width),(rEyeLeft->y+rEyeLeft->height)),
-						 CV_RGB(255,0,0), 3 );
-		}
+vector<CvRect*> Detection::detectEyes( IplImage* frame ) {
+	if ( !frame )
+		return (vector<CvRect*>)0;
 
-
-		if(storage)cvClearMemStorage( storage );
-		if(frame)cvResetImageROI( frame );
-
-		return frame;
+	return detectEyes( frame, detectFace(frame) );
 }
