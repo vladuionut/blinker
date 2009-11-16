@@ -27,15 +27,17 @@ public:
 		IplImage*: Zeiger auf Frames eines Videos.
 	*/
 	IplImage* detectVideo(IplImage*); // statt performDetection
+	bool detectBlink(IplImage*);
 
 protected:
 	const char* cascade_face_name;
 	const char* cascade_eye_name;
 
-	CvRect* rFace;
+	/*CvRect* rFace;
 	CvRect* rEyeRight;
-	CvRect* rEyeLeft;
+	CvRect* rEyeLeft;*/
 	NearestDetection* prevDetection;
+	//BlinkDetection* blinkDetector;
 
 private:
 	CvMemStorage* storage;
@@ -43,7 +45,8 @@ private:
 	CvHaarClassifierCascade* cascade_eye;	
 
 	bool loadHaarClassifier();
-	IplImage* detectFace( IplImage* frame );
-	IplImage* detectEyes( IplImage* frame );
+	CvRect* detectFace( IplImage* );
+	vector<CvRect*> detectEyes( IplImage* );
+	vector<CvRect*> detectEyes( IplImage*, CvRect* );
 };
 

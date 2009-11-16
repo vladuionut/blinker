@@ -128,6 +128,7 @@ void Blinker::play_CB(){
 
 void Blinker::detect(){
 	frame = detector->detectVideo( frame );
+	//detector->detectBlink(frame);
 }
 
 /*
