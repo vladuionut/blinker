@@ -35,6 +35,8 @@ public:
 	bool detectBlink(IplImage*, vector<CvRect*>);
 
 protected:
+	vector<IplImage*> temp;
+
 	const char* cascade_face_name;
 	const char* cascade_eye_name;
 
