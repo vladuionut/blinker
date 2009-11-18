@@ -74,7 +74,7 @@ vector<CvRect*> NearestDetection::getNearestEyes( CvSeq* seq, CvRect* face ) {
 	CvRect* rEyeRight = 0;
 	CvRect* rEyeLeft = 0;
 	CvRect* rHelp = 0;
-	vector<CvRect*> vOutput;
+	vector<CvRect*> vOutput = (vector<CvRect*>)0;
 	vector<CvRect*>::const_iterator iter = vEyeRight.begin();
 	int mxRight = 0, myRight = 0, mxLeft = 0, myLeft = 0;
 	int iHelp;

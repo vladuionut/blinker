@@ -18,10 +18,17 @@ public:
 	//~BlinkDetection();
 	
 	bool detect( IplImage*, vector<CvRect*> );
-	bool creatTemplate();
 
 protected:
+	bool init;
+	vector<IplImage*> tmpL;
+	vector<IplImage*> tmpR;
+	CvMemStorage* storage;
+
 private:
+	bool findTemplate(IplImage*, IplImage*);
+	int findEyeColor();
+
 
 };
 

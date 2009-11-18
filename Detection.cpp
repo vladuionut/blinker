@@ -13,7 +13,7 @@ bool Detection::detectBlink(IplImage* frame ) {
 }
 
 bool Detection::detectBlink(IplImage* frame, vector<CvRect*> eyes) {
-	if(!frame|| eyes != (vector<CvRect*>)0 )
+	if(!frame|| eyes == (vector<CvRect*>)0 )
 		return false;
 
 	return blinkDetector->detect( frame, eyes );
@@ -68,9 +68,11 @@ bool Detection::loadHaarClassifier() {
 	return true;
 }
 
-
 IplImage* Detection::detectVideo(IplImage* frame) {
 	if(storage)cvClearMemStorage( storage );
+
+	if( !frame )
+		return frame;
 
 	CvRect* face = detectFace( frame );
 	if (face) {
@@ -80,6 +82,8 @@ IplImage* Detection::detectVideo(IplImage* frame) {
 					 CV_RGB(255,0,0), 3 );  // blue, rectangle for face
 
 		rFace = face;
+	} else {
+		rFace = (CvRect*)0;
 	}
 	
 	if(storage)cvClearMemStorage( storage );
@@ -101,6 +105,8 @@ IplImage* Detection::detectVideo(IplImage* frame) {
 		}
 
 		rEyes = eyes;
+	}else {
+		rEyes = (vector<CvRect*>)0;
 	}
 
 	if(storage)cvClearMemStorage( storage );
