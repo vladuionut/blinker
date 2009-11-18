@@ -2,7 +2,10 @@
 #include "BlinkDetection.h"
 
 BlinkDetection::BlinkDetection() {
-
+	init = true;
+	tmpL = (vector<IplImage*>)0;
+	tmpR = (vector<IplImage*>)0;
+	storage	= (CvMemStorage*)0;
 }
 
 //BlinkDetection::~BlinkDetection() {
@@ -11,14 +14,22 @@ BlinkDetection::BlinkDetection() {
 
 bool BlinkDetection::detect( IplImage* frame, vector<CvRect*> eyes ) {
 	
-	IplImage *gray, *lgray, *rGray;
+	if(storage)cvClearMemStorage( storage );
+	storage = cvCreateMemStorage(0);
 
-	gray = cvCreateImage( cvSize(frame->width,frame->height), 8, 1 );
-	cvCvtColor( frame, gray, CV_BGR2GRAY );
+	if( !frame )
+		return false;
+	
+	if(  eyes == (vector<CvRect*>)0 || !eyes.at(0) || !eyes.at(1) )
+		return false;
 
 	return false;
 }
 
-bool BlinkDetection::creatTemplate() {
+bool BlinkDetection::findTemplate( IplImage * ltmp, IplImage * rtmp ) {
 	return false;
+}
+
+int BlinkDetection::findEyeColor() {
+	return -1;
 }
