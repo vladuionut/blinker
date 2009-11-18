@@ -94,14 +94,14 @@ IplImage* Detection::detectVideo(IplImage* frame) {
 			cvRectangle( frame, 
 						 cvPoint(eyes.at(0)->x,eyes.at(0)->y),
 						 cvPoint((eyes.at(0)->x+eyes.at(0)->width),(eyes.at(0)->y+eyes.at(0)->height)),
-						 CV_RGB(255,0,0), 3 );
+						 CV_RGB(0,255,0), 3 );
 		}
 
 		if (  eyes.at(1) ) {
 			cvRectangle( frame, 
 						 cvPoint(eyes.at(1)->x,eyes.at(1)->y),
 						 cvPoint((eyes.at(1)->x+eyes.at(1)->width),(eyes.at(1)->y+eyes.at(1)->height)),
-						 CV_RGB(255,0,0), 3 );
+						 CV_RGB(0,255,0), 3 );
 		}
 
 		rEyes = eyes;
@@ -138,24 +138,19 @@ vector<CvRect*> Detection::detectEyes( IplImage* frame, CvRect* rFace ) {
 	if ( !frame || !cascade_eye || !rFace)
 		return vEyes;
 		
-	CvRect* rect;
 	if(storage)cvClearMemStorage( storage );
 	cvSetImageROI( frame, cvRect(rFace->x, rFace->y+rFace->height/5, 
 								 rFace->width, rFace->height/3) );
 	CvSeq* eyes = cvHaarDetectObjects( frame, cascade_eye, storage, 1.2, 2, 
 									   CV_HAAR_DO_CANNY_PRUNING, cvSize(30, 30) );
 
-	
-	for ( int i = 0; i < eyes->total; i++ ) {
-		rect = (CvRect*)cvGetSeqElem( eyes, i );
-		cvRectangle( frame, 
-					 cvPoint(rect->x,rect->y),
-					 cvPoint((rect->x+rect->width),(rect->y+rect->height)),
-					 CV_RGB(0,255,0), 3 );
+	// MATEJ dieser Teil gehoert ueberarbeitet
+	if(eyes->total > 2) {
+		vEyes = vector<CvRect*>();
+		/*for ( int i = 0; i < eyes->total; i++ )
+			vEyes.insert(vEyes.end(), (CvRect*)cvGetSeqElem( eyes, i ) );*/
+		vEyes = prevDetection->getNearestEyes( eyes, rFace ); //????????????????
 	}
-
-
-	vEyes = prevDetection->getNearestEyes( eyes, rFace );
 
 	if(frame)cvResetImageROI( frame );
 
