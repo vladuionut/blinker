@@ -70,6 +70,8 @@ bool Detection::loadHaarClassifier() {
 
 
 IplImage* Detection::detectVideo(IplImage* frame) {
+	if(storage)cvClearMemStorage( storage );
+
 	CvRect* face = detectFace( frame );
 	if (face) {
 		cvRectangle( frame, 
@@ -80,6 +82,7 @@ IplImage* Detection::detectVideo(IplImage* frame) {
 		rFace = face;
 	}
 	
+	if(storage)cvClearMemStorage( storage );
 
 	vector<CvRect*> eyes = detectEyes( frame, face );
 	if(eyes != (vector<CvRect*>)0) {
