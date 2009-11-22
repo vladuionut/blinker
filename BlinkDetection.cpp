@@ -23,6 +23,9 @@ bool BlinkDetection::match(IplImage* frame, vector<CvRect*> eyes) {
 	flag_match = false;
 	CvHistogram * hist1 = (CvHistogram *)0;
 	CvHistogram * hist2 = (CvHistogram *)0;
+	IplImage * gray_frame = (IplImage *)0;
+	IplImage * gray_tmpl = (IplImage *)0;
+	CvPoint* point = (CvPoint*)0;
 	float comp1 = 0.f;
 	float comp2 = 0.f;
 
@@ -40,6 +43,40 @@ bool BlinkDetection::match(IplImage* frame, vector<CvRect*> eyes) {
 		// TODO: diff of pic -tmp
 		// TODO: measurment of clock, return false so lange bis blink 2 sec
 		
+		// motion analyse
+		gray_frame = cvCreateImage(cvGetSize(frame),8,1);
+		cvConvertImage(frame,gray_frame,CV_BGR2GRAY);
+
+		// left eye
+		gray_tmpl = cvCreateImage(cvGetSize(tmpL.tmp),8,1);
+		cvConvertImage(tmpL.tmp,gray_tmpl,CV_BGR2GRAY);
+
+		point = &cvPoint( eyes.at(0)->x + eyes.at(0)->width/2,
+						  eyes.at(0)->y + eyes.at(0)->height/2 ); /* centroids */
+		
+		cvSetImageROI( gray_frame, cvRect( point->x + tmpL.tmp->width/2, 
+									       point->y + tmpL.tmp->height/2, 
+									       tmpL.tmp->width,
+									       tmpL.tmp->height ) );
+
+
+		// cvSub(gray_frame, gray_tmpl, diff, NULL); //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+		// right eye
+		gray_tmpl = cvCreateImage(cvGetSize(tmpR.tmp),8,1);
+		cvConvertImage(tmpR.tmp,gray_tmpl,CV_BGR2GRAY);
+
+
+		point = &cvPoint( eyes.at(1)->x + eyes.at(1)->width/2,
+						  eyes.at(1)->y + eyes.at(1)->height/2 );  /* centroids */
+
+		cvResetImageROI(gray_frame);
+		cvSetImageROI( gray_frame, cvRect( point->x + tmpR.tmp->width/2, 
+									       point->y + tmpR.tmp->height/2, 
+									       tmpR.tmp->width,
+									       tmpR.tmp->height ) );
+
+		cvResetImageROI(gray_frame);
 
 		if(difftime(startTime,time(0)) > 2) {
 			flag_match = true;
