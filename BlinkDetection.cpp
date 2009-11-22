@@ -2,8 +2,9 @@
 #include "BlinkDetection.h"
 
 BlinkDetection::BlinkDetection(float _treshval) {
-	flage_init = true;
-	flage_prev = true;
+	flag_init = true;
+	flag_prev = true;
+	flag_match = true;
 	tmpL = (BlinkTemplate)0;
 	tmpR = (BlinkTemplate)0;
 	storage	= (CvMemStorage*)0;
@@ -19,6 +20,7 @@ BlinkDetection::~BlinkDetection() {
 }
 
 bool BlinkDetection::match(IplImage* frame, vector<CvRect*> eyes) {
+	flag_match = false;
 	CvHistogram * hist1 = (CvHistogram *)0;
 	CvHistogram * hist2 = (CvHistogram *)0;
 	float comp1 = 0.f;
@@ -31,17 +33,23 @@ bool BlinkDetection::match(IplImage* frame, vector<CvRect*> eyes) {
 	hist2 = createHist(frame);
 	cvResetImageROI(frame);
 
-	/*comp1 = 1 - cvCompareHist(hist1,tmpL.hist,CV_COMP_BHATTACHARYYA);
-	comp2 = 1 - cvCompareHist(hist2,tmpR.hist,CV_COMP_BHATTACHARYYA);*/
+	comp1 = 1 - cvCompareHist(hist1,tmpL.hist,CV_COMP_BHATTACHARYYA);
+	comp2 = 1 - cvCompareHist(hist2,tmpR.hist,CV_COMP_BHATTACHARYYA);
 
 	if(comp1 > treshval && comp2 > treshval) { // eyes for matching?
 		// TODO: diff of pic -tmp
-		// TODO: measurment of clock
+		// TODO: measurment of clock, return false so lange bis blink 2 sec
 		
 
-		if(difftime(startTime,time(0)) > 2)
+		if(difftime(startTime,time(0)) > 2) {
+			flag_match = true;
+			startTime = 0;
 			return true;
+		}
 	
+	}else{
+		flag_match = true;
+		startTime = 0;
 	}
 
 	if(hist1)cvReleaseHist(&hist1);
@@ -90,15 +98,15 @@ bool BlinkDetection::detect( IplImage* frame, vector<CvRect*> eyes ) {
 	prevTmpArea = cvCreateImage( cvSize( width, height ), 
 								 frame->depth, frame->nChannels ); 
 
-	if(flage_init) { // templates has to be initial
+	if(flag_init) { // templates has to be initial
 		// area of eyes from current frame
 		cvSetImageROI(frame, cvRect( x, y, width, height ));
 		cvCopy(frame, curTmpArea);
 		cvResetImageROI(frame);
 
-		if(flage_prev) {
+		if(flag_prev) {
 			temp_prev = (IplImage*)cvClone(frame);
-			flage_prev = false;
+			flag_prev = false;
 		} else {
 			// area of eyes from previous frame
 			cvSetImageROI(temp_prev, cvRect( x, y, width, height ));
@@ -106,12 +114,14 @@ bool BlinkDetection::detect( IplImage* frame, vector<CvRect*> eyes ) {
 			cvResetImageROI(temp_prev);
 
 			if( createTemplate( curTmpArea, prevTmpArea ) )
-				flage_init = false;
+				flag_init = false;
 			else
-				flage_prev = true;
+				flag_prev = true;
 		}
-	}else{ // template matching
-		startTime = time(0);
+	}else{ 
+		if(flag_match) // template matching
+			startTime = time(0);
+		
 		return match(frame,eyes);
 	}
 
