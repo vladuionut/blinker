@@ -27,17 +27,15 @@ protected:
 		CvHistogram* hist;
 		CvRect* r;
 		BlinkTemplate( IplImage* t = (IplImage*)0, CvHistogram* h = (CvHistogram*)0, CvRect* _r = (CvRect*)0) {
-			if( t )tmp = (IplImage* )cvClone(t); 
-			else tmp = (IplImage*)0;
-			if( h )hist = (CvHistogram* )cvClone(h);
-			else hist = (CvHistogram*)0;
-			if( _r )r = (CvRect* )cvClone(_r);
-			else r = (CvRect*)0;
+			tmp = t;
+			hist = h;
+			r = _r;
 		}
 	};
 
-	bool flage_init;
-	bool flage_prev;
+	bool flag_init;
+	bool flag_prev;
+	bool flag_match;
 	float treshval;
 	IplImage* temp_prev;
 	BlinkTemplate tmpL;
