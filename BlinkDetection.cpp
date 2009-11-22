@@ -1,15 +1,21 @@
 
 #include "BlinkDetection.h"
 
-BlinkDetection::BlinkDetection(float _treshval) {
+BlinkDetection::BlinkDetection( float _treshval,
+							    float _stateval1, 
+								float _stateval2, 
+								float _stateval3);
 	flag_init = true;
 	flag_prev = true;
 	flag_match = true;
+	flag_state[] = {false,false,false};
+	stateval[] = {_stateval1,_stateval2,_stateval3};
 	tmpL = (BlinkTemplate)0;
 	tmpR = (BlinkTemplate)0;
 	storage	= (CvMemStorage*)0;
 	temp_prev = (IplImage*)0;
 	treshval = _treshval;
+	stateval = 0.f;
 	startTime = 0;
 }
 
@@ -24,10 +30,16 @@ bool BlinkDetection::match(IplImage* frame, vector<CvRect*> eyes) {
 	CvHistogram * hist1 = (CvHistogram *)0;
 	CvHistogram * hist2 = (CvHistogram *)0;
 	IplImage * gray_frame = (IplImage *)0;
+	IplImage * gray_area1 = (IplImage *)0;
+	IplImage * gray_area2 = (IplImage *)0;
 	IplImage * gray_tmpl = (IplImage *)0;
+	IplImage * gray_diff = (IplImage *)0;
 	CvPoint* point = (CvPoint*)0;
 	float comp1 = 0.f;
 	float comp2 = 0.f;
+	CvPoint	minloc1, maxloc2, minloc1, maxloc2;
+	double minval1, maxval2, minval1, maxval2;
+	float corr = 0.f;
 
 	cvSetImageROI(frame,*eyes.at(0));
 	hist1 = createHist( frame );
@@ -42,46 +54,65 @@ bool BlinkDetection::match(IplImage* frame, vector<CvRect*> eyes) {
 	if(comp1 > treshval && comp2 > treshval) { // eyes for matching?
 		// TODO: diff of pic -tmp
 		// TODO: measurment of clock, return false so lange bis blink 2 sec
-		
-		// motion analyse
+
 		gray_frame = cvCreateImage(cvGetSize(frame),8,1);
 		cvConvertImage(frame,gray_frame,CV_BGR2GRAY);
 
-		// left eye
+		gray_area1 = cvCreateImage( cvSize(eyes.at(0)->width, eyes.at(0)->height),8,1 );
+	    gray_area2 = cvCreateImage( cvSize(eyes.at(1)->width, eyes.at(1)->height),8,1 );
+
+		cvSetImageROI(gray_frame,*eyes.at(0));
+		cvCopyImage(gray_frame,gray_area1);
+		cvResetImageROI(gray_frame);
+		cvSetImageROI(gray_frame,*eyes.at(1));
+		cvCopyImage(gray_frame,gray_area2);
+		cvResetImageROI(gray_frame);
+
+		/* template matching for first eye */
+		gray_diff = cvCreateImage(cvSize( eyes.at(0)->width - tmpL.tmp->width   +1, 
+										  eyes.at(0)->height - tmpL.tmp->height +1),8,1);
+
 		gray_tmpl = cvCreateImage(cvGetSize(tmpL.tmp),8,1);
 		cvConvertImage(tmpL.tmp,gray_tmpl,CV_BGR2GRAY);
 
-		point = &cvPoint( eyes.at(0)->x + eyes.at(0)->width/2,
-						  eyes.at(0)->y + eyes.at(0)->height/2 ); /* centroids */
-		
-		cvSetImageROI( gray_frame, cvRect( point->x + tmpL.tmp->width/2, 
-									       point->y + tmpL.tmp->height/2, 
-									       tmpL.tmp->width,
-									       tmpL.tmp->height ) );
+		cvMatchTemplate(gray_area1, gray_tmpl, gray_diff, CV_TM_CCOEFF_NORMED); // value [-1;1]
+		cvMinMaxLoc(gray_diff, &minval1, &maxval1, &minloc1, &maxloc1, 0);
 
+		/* template matching for second eye */
+		cvReleaseImage(&gray_diff);
+		cvReleaseImage(&gray_tmpl);
 
-		// cvSub(gray_frame, gray_tmpl, diff, NULL); //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		gray_diff = cvCreateImage(cvSize( eyes.at(1)->width - tmpR.tmp->width   +1, 
+										  eyes.at(1)->height - tmpR.tmp->height +1),8,1);
 
-		// right eye
 		gray_tmpl = cvCreateImage(cvGetSize(tmpR.tmp),8,1);
 		cvConvertImage(tmpR.tmp,gray_tmpl,CV_BGR2GRAY);
 
+		cvMatchTemplate(gray_area2, gray_tmpl, gray_diff, CV_TM_CCOEFF_NORMED);
+		cvMinMaxLoc(gray_diff, &minval2, &maxval2, &minloc2, &maxloc2, 0);
 
-		point = &cvPoint( eyes.at(1)->x + eyes.at(1)->width/2,
-						  eyes.at(1)->y + eyes.at(1)->height/2 );  /* centroids */
+		/* 4 states of blinking */
+		stateval = ( minval1 + minval2 ) / 2;
 
-		cvResetImageROI(gray_frame);
-		cvSetImageROI( gray_frame, cvRect( point->x + tmpR.tmp->width/2, 
-									       point->y + tmpR.tmp->height/2, 
-									       tmpR.tmp->width,
-									       tmpR.tmp->height ) );
+		if( flag_state[0] ) { // from open to close
 
-		cvResetImageROI(gray_frame);
+			
+
+			if( flag_state[1] ) { // closed
+				;
+				if( flag_state[2] ) { // from closed to open
+					;
+				}
+			}
+		}
+
+		if() // lost eye location
+			;
 
 		if(difftime(startTime,time(0)) > 2) {
 			flag_match = true;
 			startTime = 0;
-			return true;
+			return true; // release??
 		}
 	
 	}else{
@@ -89,8 +120,14 @@ bool BlinkDetection::match(IplImage* frame, vector<CvRect*> eyes) {
 		startTime = 0;
 	}
 
+	// release
 	if(hist1)cvReleaseHist(&hist1);
 	if(hist2)cvReleaseHist(&hist2);
+	if(gray_frame)cvReleaseImage(&gray_frame);
+	if(gray_area1)cvReleaseImage(&gray_area1);
+	if(gray_area2)cvReleaseImage(&gray_area2);
+	if(gray_tmpl)cvReleaseImage(&gray_tmpl);
+	if(gray_diff)cvReleaseImage(&gray_diff);
 
 	return false;
 }
