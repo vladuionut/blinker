@@ -28,7 +28,7 @@ Detection::Detection() {
 	vector<CvRect*> rEyes = (vector<CvRect*>)0;
 
 	prevDetection		=  new NearestDetection();
-	blinkDetector		= new BlinkDetection();
+	blinkDetector		=  new BlinkDetection();
 	loadHaarClassifier();
 }
 
@@ -138,20 +138,24 @@ vector<CvRect*> Detection::detectEyes( IplImage* frame, CvRect* rFace ) {
 	if ( !frame || !cascade_eye || !rFace)
 		return vEyes;
 		
+	CvRect* rect;
 	if(storage)cvClearMemStorage( storage );
 	cvSetImageROI( frame, cvRect(rFace->x, rFace->y+rFace->height/5, 
 								 rFace->width, rFace->height/3) );
 	CvSeq* eyes = cvHaarDetectObjects( frame, cascade_eye, storage, 1.2, 2, 
 									   CV_HAAR_DO_CANNY_PRUNING, cvSize(30, 30) );
 
-	// MATEJ dieser Teil gehoert ueberarbeitet
-	if(eyes->total > 2) {
-		vEyes = vector<CvRect*>();
-		/*for ( int i = 0; i < eyes->total; i++ )
-			vEyes.insert(vEyes.end(), (CvRect*)cvGetSeqElem( eyes, i ) );*/
-		vEyes = prevDetection->getNearestEyes( eyes, rFace ); //????????????????
+	vEyes = vector<CvRect*>();
+	for ( int i = 0; i < eyes->total; i++ ) {
+		rect = (CvRect*)cvGetSeqElem( eyes, i );
+		cvRectangle( frame, 
+					 cvPoint(rect->x,rect->y),
+					 cvPoint((rect->x+rect->width),(rect->y+rect->height)),
+					 CV_RGB(0,255,0), 3 );
+		
 	}
 
+	vEyes = prevDetection->getNearestEyes( eyes, rFace );
 	if(frame)cvResetImageROI( frame );
 
 	return vEyes;
