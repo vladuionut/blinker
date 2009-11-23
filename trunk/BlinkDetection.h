@@ -18,8 +18,7 @@ class BlinkDetection {
 public:
 	BlinkDetection( float _treshval = 0.6, 
 					float _stateval1 = 0.85, 
-					float _stateval2 = 0.55, 
-					float _stateval3 = 0.45);
+					float _stateval2 = 0.5 );
 	~BlinkDetection();
 	
 	bool detect( IplImage*, vector<CvRect*> );
@@ -42,7 +41,8 @@ protected:
 	bool flag_state[3];
 	int  blinkCounter;
 	float treshval;
-	float stateval[3];
+	float stateval[2];
+	float ncc_val;
 	IplImage* temp_prev;
 	BlinkTemplate tmpL;
 	BlinkTemplate tmpR;

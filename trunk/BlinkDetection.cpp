@@ -3,15 +3,14 @@
 
 BlinkDetection::BlinkDetection( float _treshval,
 							    float _stateval1, 
-								float _stateval2, 
-								float _stateval3) {
+								float _stateval2 ) {
 	flag_init = true;
 	flag_prev = true;
 	flag_match = true;
 	flag_state[0]=( flag_state[1]=( flag_state[2] = false));
 	stateval[0] = _stateval1;
 	stateval[1] = _stateval2;
-	stateval[2] = _stateval3;
+	ncc_val = 0.f;
 	tmpL = (BlinkTemplate)0;
 	tmpR = (BlinkTemplate)0;
 	storage	= (CvMemStorage*)0;
@@ -24,11 +23,9 @@ BlinkDetection::BlinkDetection( float _treshval,
 BlinkDetection::~BlinkDetection() {
 	if(temp_prev)cvReleaseImage( &temp_prev );
 	if(storage)cvClearMemStorage( storage );
-
 }
 
 bool BlinkDetection::match(IplImage* frame, vector<CvRect*> eyes) {
-	flag_match = false;
 	CvHistogram * hist1 = (CvHistogram *)0;
 	CvHistogram * hist2 = (CvHistogram *)0;
 	IplImage * gray_frame = (IplImage *)0;
@@ -39,10 +36,12 @@ bool BlinkDetection::match(IplImage* frame, vector<CvRect*> eyes) {
 	CvPoint* point = (CvPoint*)0;
 	float comp1 = 0.f;
 	float comp2 = 0.f;
-	CvPoint	minloc1, maxloc1, minloc2, maxloc2;
+	CvPoint	minloc1, maxloc1, 
+			minloc2, maxloc2,
+			centro1, centro2;
 	double minval1, maxval1, minval2, maxval2;
-	float corr = 0.f;
 
+	/* histogram matching */
 	cvSetImageROI(frame,*eyes.at(0));
 	hist1 = createHist( frame );
 	cvResetImageROI(frame);
@@ -53,7 +52,7 @@ bool BlinkDetection::match(IplImage* frame, vector<CvRect*> eyes) {
 	comp1 = 1 - cvCompareHist(hist1,tmpL.hist,CV_COMP_BHATTACHARYYA);
 	comp2 = 1 - cvCompareHist(hist2,tmpR.hist,CV_COMP_BHATTACHARYYA);
 
-	if(comp1 > treshval && comp2 > treshval) { // eyes for matching?
+	if(comp1 > treshval && comp2 > treshval) {			// eyes for matching?
 		gray_frame = cvCreateImage(cvGetSize(frame),8,1);
 		cvConvertImage(frame,gray_frame,CV_BGR2GRAY);
 
@@ -68,6 +67,9 @@ bool BlinkDetection::match(IplImage* frame, vector<CvRect*> eyes) {
 		cvResetImageROI(gray_frame);
 
 		/* template matching for first eye */
+		centro1 = cvPoint( eyes.at(0)->x + eyes.at(0)->width/2,
+						   eyes.at(0)->y + eyes.at(0)->height/2 );
+
 		gray_diff = cvCreateImage(cvSize( eyes.at(0)->width - tmpL.tmp->width   +1, 
 										  eyes.at(0)->height - tmpL.tmp->height +1),8,1);
 
@@ -78,6 +80,9 @@ bool BlinkDetection::match(IplImage* frame, vector<CvRect*> eyes) {
 		cvMinMaxLoc(gray_diff, &minval1, &maxval1, &minloc1, &maxloc1, 0);
 
 		/* template matching for second eye */
+		centro2 = cvPoint( eyes.at(1)->x + eyes.at(1)->width/2,
+						   eyes.at(1)->y + eyes.at(1)->height/2 );
+
 		cvReleaseImage(&gray_diff);
 		cvReleaseImage(&gray_tmpl);
 
@@ -91,40 +96,57 @@ bool BlinkDetection::match(IplImage* frame, vector<CvRect*> eyes) {
 		cvMinMaxLoc(gray_diff, &minval2, &maxval2, &minloc2, &maxloc2, 0);
 
 		/* 4 states of blinking */
-		if( !flag_state[0] && 
-			( minval1 > stateval[0] && minval2 > stateval[0] ) ) { // from open to closed
-				flag_state[0] = true;
+		if( ( // width
+			  minloc1.x > tmpL.r->x - tmpL.r->width/2 &&
+			  minloc2.x > tmpR.r->x - tmpR.r->width/2 &&
+			  minloc1.x < tmpL.r->x + tmpL.r->width/2 &&
+			  minloc2.x < tmpR.r->x + tmpR.r->width/2 &&
+			  // height
+			  minloc1.y > tmpL.r->y - tmpL.r->height/2 &&
+			  minloc2.y > tmpR.r->y - tmpR.r->height/2 &&
+			  minloc1.y < tmpL.r->y + tmpL.r->height/2 &&
+			  minloc2.y < tmpR.r->y + tmpR.r->height/2    )) {
+		
+				if( !flag_state[0] &&
+				   ( minval1 < ncc_val && minval2 < ncc_val ) ) { // from open to closed
+						if( ncc_val < stateval[0] )
+							flag_state[0] = true;
+				}
+				else if( flag_state[0] && !flag_state[1] &&
+						 minval1 < ncc_val && minval2 < ncc_val )
+						; // wait
+				else if( flag_state[0] && !flag_state[1] &&
+						 minval1 > ncc_val && minval2 > ncc_val ) {
+					if( ncc_val > stateval[1] - 0.05 && ncc_val < stateval[1] + 0.05 ) // closed
+						flag_state[1] = true;
+					else
+						flag_match = true; // stop template matching
+				}
+				else if( flag_state[0] && flag_state[1] && !flag_state[2] &&
+						( minval1 > ncc_val && minval2 > ncc_val ) ) { // from closed to open
+							if( ncc_val > stateval[0] )
+								flag_state[2] = true;
+				}
+				else if( flag_state[0] && flag_state[1] && flag_state[2] ) {
+					++blinkCounter;
+					flag_state[0]=( flag_state[1]=( flag_state[2] = false));
+				}
+				else if( ncc_val == -2 )
+					ncc_val = (minval1 + minval2)/2;
+				else
+					flag_match = true; // stop template matching
 		}
-		else if( flag_state[0] && !flag_state[1] &&
-				( minval1 > stateval[1] - 0.05 && minval2 > stateval[1] - 0.05 ) &&
-				( minval1 < stateval[1] + 0.05 && minval2 < stateval[1] + 0.05 ) ) { // closed
-				flag_state[1] = true;
-		} 
-		else if(  flag_state[0] && flag_state[1] && !flag_state[2] &&
-				( minval1 > stateval[1] && minval2 > stateval[1] ) ) { // from closed to open
-				flag_state[2] = true;
-		} else if( flag_state[0] && flag_state[1] && flag_state[2] ) {
-			++blinkCounter;
-			flag_state[0]=( flag_state[1]=( flag_state[2] = false));
-		}
-		else {
-			flag_state[0]=( flag_state[1]=( flag_state[2] = false));
-			flag_match = true;
-			startTime = 0;
-		}
+						
+		ncc_val = (minval1 + minval2)/2;
 
 		if(difftime(startTime,time(0)) > 2) {
-			flag_state[0]=( flag_state[1]=( flag_state[2] = false));
 			flag_match = true;
-			startTime = 0;
 			if( blinkCounter > 2 )
 				return true;
 		}
 	
-	}else{
-		flag_match = true;
-		startTime = 0;
-	}
+	}else
+		flag_match = true; // stop template matching
 
 	// release
 	if(hist1)cvReleaseHist(&hist1);
@@ -199,8 +221,12 @@ bool BlinkDetection::detect( IplImage* frame, vector<CvRect*> eyes ) {
 				flag_prev = true;
 		}
 	}else{ 
-		if(flag_match) // template matching
+		if(flag_match) {// template matching
+			flag_state[0]=( flag_state[1]=( flag_state[2] = false));
 			startTime = time(0);
+			ncc_val = 0.f;
+			flag_match = false;
+		}
 		
 		return match(frame,eyes);
 	}
