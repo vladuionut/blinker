@@ -40,7 +40,7 @@ protected:
 	bool flag_prev;
 	bool flag_match;
 	bool flag_state[3];
-	float stateval;
+	int  blinkCounter;
 	float treshval;
 	float stateval[3];
 	IplImage* temp_prev;
