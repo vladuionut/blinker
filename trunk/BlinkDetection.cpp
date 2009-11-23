@@ -4,18 +4,20 @@
 BlinkDetection::BlinkDetection( float _treshval,
 							    float _stateval1, 
 								float _stateval2, 
-								float _stateval3);
+								float _stateval3) {
 	flag_init = true;
 	flag_prev = true;
 	flag_match = true;
-	flag_state[] = {false,false,false};
-	stateval[] = {_stateval1,_stateval2,_stateval3};
+	flag_state[0]=( flag_state[1]=( flag_state[2] = false));
+	stateval[0] = _stateval1;
+	stateval[1] = _stateval2;
+	stateval[2] = _stateval3;
 	tmpL = (BlinkTemplate)0;
 	tmpR = (BlinkTemplate)0;
 	storage	= (CvMemStorage*)0;
 	temp_prev = (IplImage*)0;
 	treshval = _treshval;
-	stateval = 0.f;
+	blinkCounter = 0;
 	startTime = 0;
 }
 
@@ -37,8 +39,8 @@ bool BlinkDetection::match(IplImage* frame, vector<CvRect*> eyes) {
 	CvPoint* point = (CvPoint*)0;
 	float comp1 = 0.f;
 	float comp2 = 0.f;
-	CvPoint	minloc1, maxloc2, minloc1, maxloc2;
-	double minval1, maxval2, minval1, maxval2;
+	CvPoint	minloc1, maxloc1, minloc2, maxloc2;
+	double minval1, maxval1, minval2, maxval2;
 	float corr = 0.f;
 
 	cvSetImageROI(frame,*eyes.at(0));
@@ -52,9 +54,6 @@ bool BlinkDetection::match(IplImage* frame, vector<CvRect*> eyes) {
 	comp2 = 1 - cvCompareHist(hist2,tmpR.hist,CV_COMP_BHATTACHARYYA);
 
 	if(comp1 > treshval && comp2 > treshval) { // eyes for matching?
-		// TODO: diff of pic -tmp
-		// TODO: measurment of clock, return false so lange bis blink 2 sec
-
 		gray_frame = cvCreateImage(cvGetSize(frame),8,1);
 		cvConvertImage(frame,gray_frame,CV_BGR2GRAY);
 
@@ -88,31 +87,38 @@ bool BlinkDetection::match(IplImage* frame, vector<CvRect*> eyes) {
 		gray_tmpl = cvCreateImage(cvGetSize(tmpR.tmp),8,1);
 		cvConvertImage(tmpR.tmp,gray_tmpl,CV_BGR2GRAY);
 
-		cvMatchTemplate(gray_area2, gray_tmpl, gray_diff, CV_TM_CCOEFF_NORMED);
+		cvMatchTemplate(gray_area2, gray_tmpl, gray_diff, CV_TM_CCOEFF_NORMED); 
 		cvMinMaxLoc(gray_diff, &minval2, &maxval2, &minloc2, &maxloc2, 0);
 
 		/* 4 states of blinking */
-		stateval = ( minval1 + minval2 ) / 2;
-
-		if( flag_state[0] ) { // from open to close
-
-			
-
-			if( flag_state[1] ) { // closed
-				;
-				if( flag_state[2] ) { // from closed to open
-					;
-				}
-			}
+		if( !flag_state[0] && 
+			( minval1 > stateval[0] && minval2 > stateval[0] ) ) { // from open to closed
+				flag_state[0] = true;
 		}
-
-		if() // lost eye location
-			;
-
-		if(difftime(startTime,time(0)) > 2) {
+		else if( flag_state[0] && !flag_state[1] &&
+				( minval1 > stateval[1] - 0.05 && minval2 > stateval[1] - 0.05 ) &&
+				( minval1 < stateval[1] + 0.05 && minval2 < stateval[1] + 0.05 ) ) { // closed
+				flag_state[1] = true;
+		} 
+		else if(  flag_state[0] && flag_state[1] && !flag_state[2] &&
+				( minval1 > stateval[1] && minval2 > stateval[1] ) ) { // from closed to open
+				flag_state[2] = true;
+		} else if( flag_state[0] && flag_state[1] && flag_state[2] ) {
+			++blinkCounter;
+			flag_state[0]=( flag_state[1]=( flag_state[2] = false));
+		}
+		else {
+			flag_state[0]=( flag_state[1]=( flag_state[2] = false));
 			flag_match = true;
 			startTime = 0;
-			return true; // release??
+		}
+
+		if(difftime(startTime,time(0)) > 2) {
+			flag_state[0]=( flag_state[1]=( flag_state[2] = false));
+			flag_match = true;
+			startTime = 0;
+			if( blinkCounter > 2 )
+				return true;
 		}
 	
 	}else{
