@@ -11,92 +11,12 @@
 #include "Blinker.h"
 
 /*
-	Constructor.
-*/
-Blinker::Blinker(int width = 700, int height =400, const char* title = "Blinker"):Fl_Double_Window(width,height,title){
-	flag_play = false;
-	scroll = (Fl_Scroll*)0;
-	cam_opener = (Fl_Button*)0;
-	pic = (Fl_OpenCV*)0;
-	frame = (IplImage*)0;
-	detector = new Detection();
-}
-
-/*
-	Destructor.
-*/
-Blinker::~Blinker(){
-	delete detector;
-	delete scroll;
-	delete cam_opener;
-}
-
-/*
-	Diese Methode erzeugt die Fensterapplikation.  
-*/
-void Blinker::creatWin(){
-	try {
-
-		this->color((Fl_Color)31);
-		this->begin();
-		{
-			scroll = new Fl_Scroll(5, 10, 330, 250);
-			scroll->box(FL_EMBOSSED_FRAME);
-			scroll->color((Fl_Color)23);
-			pic = new Fl_OpenCV(10,15,320,240);
-			scroll->add(pic);
-			pic->FitWindows();
-			scroll->end();
-		}
-		{
-			cam_opener = new Fl_Button(376, 80, 215, 30, "Open Web-CAM");
-			cam_opener->box(FL_PLASTIC_UP_BOX);
-			cam_opener->color(FL_SELECTION_COLOR);
-			cam_opener->labelfont(1);
-			cam_opener->labelsize(15);
-			cam_opener->callback((Fl_Callback*)openCam_stat,this);
-		}
-
-		this->end();
-		this->resizable(this);
-		this->show();
-
-	} catch(exception &ex){
-		cerr << ex.what() << endl;
-	}
-}
-
-/*
-	Statische Methode, die nach Druecken von cam_opener das Aufrufen der Methode openCam durchfuehrt.
-*/
-void Blinker::openCam_stat(Fl_Widget* wid, void* v) {
-	((Blinker*)v)->openCam();
-}
-/*
 	Bei bestehendem Verbindungsaufbau zur Webcam und Ausspielen von Videodaten wird ueber 
 	die Callbackmethode openCam_CB Videomaterial im Container scroll ausgegeben.
 */
 void Blinker::openCam(){
-		openCam_CB();
-		scroll->redraw();
-}
-
-/*
-	Callbackmethode fuer den Verbindungsaufbau zur Webcam und Ausspielen der Videodaten 
-	wird von openCam aufgerufen. Knopft cam_opener wird deaktiviert.
-*/
-void Blinker::openCam_CB(){
-	try {
-		if(!cap.CaptureFromCAM(0)) // Default -1
-			return;
-		pic->SetImage(cap.GetFrame());
-		scroll->redraw();
-		flag_play=true;
-		Fl::add_timeout(0.05, (Fl_Timeout_Handler)play_CB_stat, this);
-		cam_opener->deactivate();
-	} catch(exception &ex){
-		cerr << ex.what() << endl;
-	}
+	openCam_CB();
+	scroll->redraw();
 }
 
 /*
@@ -108,28 +28,112 @@ void Blinker::play_CB_stat(void* v){
 }
 
 /*
-	Wird alle 0.01 Sekunden aufgerufen um ein neues Bild des Videostroms
+	Wird alle 0.04 Sekunden aufgerufen um ein neues Bild des Videostroms
 	zu holen und auszugeben.
 */
 void Blinker::play_CB(){
-	if(flag_play==false) 
-		return;
-	frame=cap.GetFrame();
-	
-	
-	detect(); // detect face and eyes
+	CvRect* rect = 0;
 
-	pic->SetImage(frame);
+	if(flag_play == false) 
+		return;
+
+	img_frame = cap.getFrame();
+	img_frame = detection->detectVideo( img_frame );
+	if( detection->detectBlink( img_frame, detection->rEyes ) )
+		cout << "Blink!";
+
+	win_frame->setImage( img_frame );
 	scroll->redraw();
 	Fl::wait(0);
 
-	Fl::add_timeout(0.01, (Fl_Timeout_Handler)play_CB_stat, this);
+	Fl::add_timeout(0.04, (Fl_Timeout_Handler)play_CB_stat, this);
 }
 
-void Blinker::detect(){
-	frame = detector->detectVideo( frame );
-	if( detector->detectBlink( frame, detector->rEyes ) )
-		cout << "Blink!";
+/*
+	Callbackmethode fuer den Verbindungsaufbau zur Webcam und Ausspielen der Videodaten 
+	wird von openCam aufgerufen. Knopft cam_opener wird deaktiviert.
+*/
+void Blinker::openCam_CB(){
+	try {
+		cap.captureFromCamera(0);
+		win_frame->setImage(cap.getFrame());		
+		scroll_eye->redraw();
+		scroll->redraw();
+		flag_play = true;
+		Fl::add_timeout(0.04, (Fl_Timeout_Handler)play_CB_stat, this);
+	} catch(exception &ex){
+		cerr << ex.what() << endl;
+	}
+}
+
+/*
+	Constructor.
+*/
+Blinker::Blinker(int width = 700, int height =400, const char* title = "Blinker"):Fl_Double_Window(width,height,title){
+	flag_play			= false;
+	scroll				= (Fl_Scroll*)0;
+	scroll_eye			= (Fl_Scroll*)0;
+	scroll_eye_template = (Fl_Scroll*)0;
+	win_frame			= (CWindow*)0;
+	win_eye				= (CWindow*)0;
+	win_eye_template	= (CWindow*)0;
+	img_frame			= (IplImage*)0;
+	img_eye				= (IplImage*)0;
+	img_eye_template	= (IplImage*)0;
+
+	/*face = new CFace();*/
+	detection = new CDetection();
+}
+
+/*
+	Destructor.
+*/
+Blinker::~Blinker(){
+	if( img_frame )
+		cvReleaseImage( &img_frame );
+
+	/*delete face;*/
+}
+
+/*
+	Diese Methode erzeugt die Fensterapplikation.  
+*/
+void Blinker::creatWin(){
+	try {
+		this->color((Fl_Color)31);
+		this->begin();
+		{
+			scroll = new Fl_Scroll(5, 10, 430, 325); // 330, 250
+			scroll->box(FL_EMBOSSED_FRAME);
+			scroll->color((Fl_Color)23);
+			win_frame = new CWindow(10,15,420,315);
+			scroll->add(win_frame);
+			scroll->end();
+		}		
+		{
+			scroll_eye_template = new Fl_Scroll(500, 10, 100, 100);
+			scroll_eye_template->box(FL_EMBOSSED_FRAME);
+			scroll_eye_template->color((Fl_Color)23);
+			win_eye_template = new CWindow(505, 15, 90, 90);
+			scroll_eye_template->end();
+		}
+		{
+			scroll_eye = new Fl_Scroll(500, 150, 100, 100);
+			scroll_eye->box(FL_EMBOSSED_FRAME);
+			scroll_eye->color((Fl_Color)23);
+			win_eye = new CWindow(505, 155, 90, 90);
+			scroll_eye->add(win_eye);
+			scroll_eye->end();
+		}
+
+		this->end();
+		this->show();
+
+		openCam();
+
+	} catch(exception &ex){
+		cerr << ex.what() << endl;
+	}
 }
 
 /*

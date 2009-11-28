@@ -1,175 +1,31 @@
 
 #include "BlinkDetection.h"
 
-BlinkDetection::BlinkDetection( float _treshval,
-							    float _stateval1, 
-								float _stateval2 ) {
-	flag_init = true;
-	flag_prev = true;
-	flag_match = true;
-	flag_state[0]=( flag_state[1]=( flag_state[2] = false));
-	stateval[0] = _stateval1;
-	stateval[1] = _stateval2;
-	ncc_val = 0.f;
-	tmpL = (BlinkTemplate)0;
-	tmpR = (BlinkTemplate)0;
-	storage	= (CvMemStorage*)0;
-	temp_prev = (IplImage*)0;
-	treshval = _treshval;
-	blinkCounter = 0;
+
+BlinkDetection::BlinkDetection( float _treshval ) {
 	startTime = 0;
+	curTime = 0;
+	treshval = _treshval;
+	flag_match = true;
+	templ_img = vector<IplImage*>();
+	templ_r = vector<CvRect*>();
+	ncc = vector<float>();
+	m_frame = 0;
 }
 
 BlinkDetection::~BlinkDetection() {
-	if(temp_prev)cvReleaseImage( &temp_prev );
-	if(storage)cvClearMemStorage( storage );
-}
-
-bool BlinkDetection::match(IplImage* frame, vector<CvRect*> eyes) {
-	CvHistogram * hist1 = (CvHistogram *)0;
-	CvHistogram * hist2 = (CvHistogram *)0;
-	IplImage * gray_frame = (IplImage *)0;
-	IplImage * gray_area1 = (IplImage *)0;
-	IplImage * gray_area2 = (IplImage *)0;
-	IplImage * gray_tmpl = (IplImage *)0;
-	IplImage * gray_diff = (IplImage *)0;
-	CvPoint* point = (CvPoint*)0;
-	float comp1 = 0.f;
-	float comp2 = 0.f;
-	CvPoint	minloc1, maxloc1, 
-			minloc2, maxloc2,
-			centro1, centro2;
-	double minval1, maxval1, minval2, maxval2;
-
-	/* histogram matching */
-	cvSetImageROI(frame,*eyes.at(0));
-	hist1 = createHist( frame );
-	cvResetImageROI(frame);
-	cvSetImageROI(frame,*eyes.at(1));
-	hist2 = createHist(frame);
-	cvResetImageROI(frame);
-
-	comp1 = 1 - cvCompareHist(hist1,tmpL.hist,CV_COMP_BHATTACHARYYA);
-	comp2 = 1 - cvCompareHist(hist2,tmpR.hist,CV_COMP_BHATTACHARYYA);
-
-	if(comp1 > treshval && comp2 > treshval) {			// eyes for matching?
-		gray_frame = cvCreateImage(cvGetSize(frame),8,1);
-		cvConvertImage(frame,gray_frame,CV_BGR2GRAY);
-
-		gray_area1 = cvCreateImage( cvSize(eyes.at(0)->width, eyes.at(0)->height),8,1 );
-	    gray_area2 = cvCreateImage( cvSize(eyes.at(1)->width, eyes.at(1)->height),8,1 );
-
-		cvSetImageROI(gray_frame,*eyes.at(0));
-		cvCopyImage(gray_frame,gray_area1);
-		cvResetImageROI(gray_frame);
-		cvSetImageROI(gray_frame,*eyes.at(1));
-		cvCopyImage(gray_frame,gray_area2);
-		cvResetImageROI(gray_frame);
-
-		/* template matching for first eye */
-		centro1 = cvPoint( eyes.at(0)->x + eyes.at(0)->width/2,
-						   eyes.at(0)->y + eyes.at(0)->height/2 );
-
-		gray_diff = cvCreateImage(cvSize( eyes.at(0)->width - tmpL.tmp->width   +1, 
-										  eyes.at(0)->height - tmpL.tmp->height +1),8,1);
-
-		gray_tmpl = cvCreateImage(cvGetSize(tmpL.tmp),8,1);
-		cvConvertImage(tmpL.tmp,gray_tmpl,CV_BGR2GRAY);
-
-		cvMatchTemplate(gray_area1, gray_tmpl, gray_diff, CV_TM_CCOEFF_NORMED); // value [-1;1]
-		cvMinMaxLoc(gray_diff, &minval1, &maxval1, &minloc1, &maxloc1, 0);
-
-		/* template matching for second eye */
-		centro2 = cvPoint( eyes.at(1)->x + eyes.at(1)->width/2,
-						   eyes.at(1)->y + eyes.at(1)->height/2 );
-
-		cvReleaseImage(&gray_diff);
-		cvReleaseImage(&gray_tmpl);
-
-		gray_diff = cvCreateImage(cvSize( eyes.at(1)->width - tmpR.tmp->width   +1, 
-										  eyes.at(1)->height - tmpR.tmp->height +1),8,1);
-
-		gray_tmpl = cvCreateImage(cvGetSize(tmpR.tmp),8,1);
-		cvConvertImage(tmpR.tmp,gray_tmpl,CV_BGR2GRAY);
-
-		cvMatchTemplate(gray_area2, gray_tmpl, gray_diff, CV_TM_CCOEFF_NORMED); 
-		cvMinMaxLoc(gray_diff, &minval2, &maxval2, &minloc2, &maxloc2, 0);
-
-		/* 4 states of blinking */
-		if( ( // width
-			  minloc1.x > tmpL.r->x - tmpL.r->width/2 &&
-			  minloc2.x > tmpR.r->x - tmpR.r->width/2 &&
-			  minloc1.x < tmpL.r->x + tmpL.r->width/2 &&
-			  minloc2.x < tmpR.r->x + tmpR.r->width/2 &&
-			  // height
-			  minloc1.y > tmpL.r->y - tmpL.r->height/2 &&
-			  minloc2.y > tmpR.r->y - tmpR.r->height/2 &&
-			  minloc1.y < tmpL.r->y + tmpL.r->height/2 &&
-			  minloc2.y < tmpR.r->y + tmpR.r->height/2    )) {
-		
-				if( !flag_state[0] &&
-				   ( minval1 < ncc_val && minval2 < ncc_val ) ) { // from open to closed
-						if( ncc_val < stateval[0] )
-							flag_state[0] = true;
-				}
-				else if( flag_state[0] && !flag_state[1] &&
-						 minval1 < ncc_val && minval2 < ncc_val )
-						; // wait
-				else if( flag_state[0] && !flag_state[1] &&
-						 minval1 > ncc_val && minval2 > ncc_val ) {
-					if( ncc_val > stateval[1] - 0.05 && ncc_val < stateval[1] + 0.05 ) // closed
-						flag_state[1] = true;
-					else
-						flag_match = true; // stop template matching
-				}
-				else if( flag_state[0] && flag_state[1] && !flag_state[2] &&
-						( minval1 > ncc_val && minval2 > ncc_val ) ) { // from closed to open
-							if( ncc_val > stateval[0] )
-								flag_state[2] = true;
-				}
-				else if( flag_state[0] && flag_state[1] && flag_state[2] ) {
-					++blinkCounter;
-					flag_state[0]=( flag_state[1]=( flag_state[2] = false));
-				}
-				else if( ncc_val == -2 )
-					ncc_val = (minval1 + minval2)/2;
-				else
-					flag_match = true; // stop template matching
-		}
-						
-		ncc_val = (minval1 + minval2)/2;
-
-		if(difftime(startTime,time(0)) > 2) {
-			flag_match = true;
-			if( blinkCounter > 2 )
-				return true;
-		}
-	
-	}else
-		flag_match = true; // stop template matching
-
-	// release
-	if(hist1)cvReleaseHist(&hist1);
-	if(hist2)cvReleaseHist(&hist2);
-	if(gray_frame)cvReleaseImage(&gray_frame);
-	if(gray_area1)cvReleaseImage(&gray_area1);
-	if(gray_area2)cvReleaseImage(&gray_area2);
-	if(gray_tmpl)cvReleaseImage(&gray_tmpl);
-	if(gray_diff)cvReleaseImage(&gray_diff);
-
-	return false;
+	if(!templ_img.empty())templ_img.clear();
+	if(!templ_r.empty())templ_r.clear();
+	if(!ncc.empty())ncc.clear();
+	if(m_frame)cvReleaseImage(&m_frame);
 }
 
 bool BlinkDetection::detect( IplImage* frame, vector<CvRect*> eyes ) {
 	
-	m_frame = frame; // loeschen???????????????????????????????????????????
-
-	int width, height, x, y, help1, help2;
-	IplImage *curTmpArea = (IplImage*)0;
-	IplImage *prevTmpArea = (IplImage*)0;
-
-	if(storage)cvClearMemStorage( storage );
-	storage = cvCreateMemStorage(0);
+	vector<IplImage*> cur_img = vector<IplImage*>();
+	vector<CvRect*> cur_r = vector<CvRect*>();
+	/*CvMat* mat = 0;
+	CvMat stub;*/
 
 	if( !frame )
 		return false;
@@ -177,274 +33,123 @@ bool BlinkDetection::detect( IplImage* frame, vector<CvRect*> eyes ) {
 	if(  eyes == (vector<CvRect*>)0 || !eyes.at(0) || !eyes.at(1) )
 		return false;
 
-	x = min(eyes.at(0)->x,eyes.at(1)->x);
-	y = min(eyes.at(0)->y,eyes.at(1)->y);
-	help1 =  eyes.at(0)->x + eyes.at(0)->width;
-	help2 =	 eyes.at(1)->x + eyes.at(1)->width;
-	width =	 max(help1,help2);
-	width -= x;
-	help1 =  eyes.at(0)->y + eyes.at(0)->height;
-	help2 =	 eyes.at(1)->y + eyes.at(1)->height;
-	height = max(help1, help2);
-	height -=  y;
-		
-	curTmpArea = cvCreateImage( cvSize( width, height ), 
-									 frame->depth, frame->nChannels ); 
+	/*if(m_frame)cvReleaseImage(&m_frame);
+	m_frame = cvCreateImage(cvGetSize(frame),frame->depth,frame->nChannels);
+	mat = cvGetMat( frame, &stub); 
+	cvConvertImage( mat, m_frame, CV_CVTIMG_SWAP_RB );*/
 
-	// loeschen !!!!!!!!!!!!!!!!!
-	cvRectangle( frame, 
-				 cvPoint(x,y),
-				 cvPoint((x+width),(y+height)),
-				 CV_RGB(0,0,255), 3 );
+	
 
-	prevTmpArea = cvCreateImage( cvSize( width, height ), 
-								 frame->depth, frame->nChannels ); 
-
-	if(flag_init) { // templates has to be initial
-		// area of eyes from current frame
-		cvSetImageROI(frame, cvRect( x, y, width, height ));
-		cvCopy(frame, curTmpArea);
+	if(templ_img.empty() || templ_r.empty()) { // init template
+		createTemplate(frame,eyes.at(0),eyes.at(1));
+	}else{
+		if(flag_match) { // start prev/cur matching, start timer
+			startTime = time(0);
+			flag_match = false;
+			if(ncc.empty())ncc.clear();
+		}
+		cur_r.insert(cur_r.end(), eyes.at(0)); 
+		cur_r.insert(cur_r.end(),  eyes.at(1));
+			 
+		cvSetImageROI(frame, *cur_r.at(0));
+		cur_img.insert( cur_img.end(), cvCloneImage(frame) );
+		cvResetImageROI(frame);
+		cvSetImageROI(frame, *cur_r.at(1));
+		cur_img.insert( cur_img.end(), cvCloneImage(frame) );
 		cvResetImageROI(frame);
 
-		if(flag_prev) {
-			temp_prev = (IplImage*)cvClone(frame);
-			flag_prev = false;
-		} else {
-			// area of eyes from previous frame
-			cvSetImageROI(temp_prev, cvRect( x, y, width, height ));
-			cvCopy(temp_prev, prevTmpArea);
-			cvResetImageROI(temp_prev);
-
-			if( createTemplate( curTmpArea, prevTmpArea ) )
-				flag_init = false;
-			else
-				flag_prev = true;
-		}
-	}else{ 
-		if(flag_match) {// template matching
-			flag_state[0]=( flag_state[1]=( flag_state[2] = false));
-			startTime = time(0);
-			ncc_val = 0.f;
-			flag_match = false;
-		}
-		
-		return match(frame,eyes);
-	}
-
-	if(curTmpArea)cvReleaseImage(&curTmpArea);
-	if(prevTmpArea)cvReleaseImage(&prevTmpArea);
-
-	if(storage)cvClearMemStorage( storage );
-
-	return false;
-}
-
-bool BlinkDetection::createTemplate( IplImage * curTmpArea, IplImage * prevTmpArea ) {
-
-	if( !curTmpArea || !prevTmpArea )
-		return false;
-
-	IplConvKernel* kernel = (IplConvKernel*)0;
-	CvSeq* comp = (CvSeq*)0;
-	int numComp = 0;
-	IplImage *eyeComp1 = (IplImage *)0; 
-	IplImage *eyeComp2 = (IplImage *)0; 
-
-	IplImage *diff = cvCreateImage( cvGetSize(curTmpArea), 8, 1);
-	IplImage *curGray = cvCreateImage( cvGetSize(curTmpArea), 8, 1);
-	IplImage *prevGray = cvCreateImage( cvGetSize(curTmpArea), 8, 1 );
-
-	cvConvertImage(curTmpArea, curGray, CV_BGR2GRAY);
-	cvConvertImage(prevTmpArea, prevGray, CV_BGR2GRAY);
-
-	// motion analysis
-	cvSub(curGray, prevGray, diff, NULL);
-	cvThreshold(diff, diff, 5, 255, CV_THRESH_BINARY);
-
-	// noise reduction
-	kernel = cvCreateStructuringElementEx(3, 3, 1, 1, CV_SHAPE_CROSS, NULL);
-	cvMorphologyEx(diff, diff, NULL, kernel, CV_MOP_OPEN, 1);
-
-	numComp = cvFindContours(   diff,                   /* the difference image */
-								storage,                /* created with cvCreateMemStorage() */
-								&comp,                  /* output: connected components */
-								sizeof(CvContour),
-								CV_RETR_CCOMP,
-								CV_CHAIN_APPROX_SIMPLE,
-								cvPoint(0,0)
-								);
-
-	// find eye pair
-	if( comp != 0 && numComp == 2) 
-	{
-		CvRect* r1 = &cvBoundingRect(comp, 1);
-		comp = comp->h_next;
-		if(comp == 0)
-			return false;
-		CvRect* r2 = &cvBoundingRect(comp, 1);
-
-		// width of eyes are about the same
-		if( abs(r1->width - r2->width) < (r1->width + r2->width)/(2*5) )
-			return false;
-
-		// height of eyes are about the same
-		if( abs(r1->height - r2->height) < (r1->height + r2->height)/(2*5) )
-			return false;
-
-		// vertical distance
-		if( abs(r1->y - r2->y) < (r1->height + r2->height)/4 )
-			return false;
-
-		// horizontal distance
-		if( abs(r1->x - r2->x) < (r1->width + r2->width) )
-			return false;
-
-		// loeschen !!!!!!!!!!!!!!!!!
-		cvRectangle( m_frame, 
-				 cvPoint(r1->x,r1->y),
-				 cvPoint((r1->x+r1->width),(r1->y+r1->height)),
-				 CV_RGB(0,100,155), 3 );
-		cvRectangle( m_frame, 
-				 cvPoint(r2->x,r2->y),
-				 cvPoint((r2->x+r2->width),(r2->y+r2->height)),
-				 CV_RGB(0,100,155), 3 );
-
-		// RGB eye area for histogramm detection 
-		eyeComp1 = cvCreateImage( cvSize(r1->width, r1->height), curTmpArea->depth, curTmpArea->nChannels);
-	    eyeComp2 = cvCreateImage( cvSize(r2->width, r2->height),  curTmpArea->depth, curTmpArea->nChannels);
-
-		cvSetImageROI(curTmpArea, *r1);
-		cvCopy(curTmpArea, eyeComp1);
-		cvResetImageROI(curTmpArea);
-		cvSetImageROI(curTmpArea, *r2);
-		cvCopy(curTmpArea, eyeComp2);
-		cvResetImageROI(curTmpArea);
-
-
-		if( is_eye_open( eyeComp1, eyeComp2 ) ) 
-		{
-			tmpL.tmp = (IplImage*)cvClone(eyeComp1);
-			tmpL.hist = (CvHistogram*)cvClone(createHist(eyeComp1));
-			tmpL.r = (CvRect*)cvClone(r1);
-			tmpR.tmp = (IplImage*)cvClone(eyeComp2);
-			tmpR.hist = (CvHistogram*)cvClone(createHist(eyeComp2));
-			tmpR.r = (CvRect*)cvClone(r2);
-	
+		if( match( cur_img, cur_r ) ) {
+			if( difftime(startTime, curTime) > 2 )
+				flag_match = true; // loop frame by frame for 2 sec
 			return true;
 		}
-
+		else
+			flag_match = true;
 	}
 
-	if(storage)cvClearMemStorage( storage );
-
-	if(eyeComp1)cvReleaseImage(&eyeComp1);
-	if(eyeComp2)cvReleaseImage(&eyeComp2);
-	
-	return false; // open eye pair was not found
-}
-
-bool BlinkDetection::is_eye_open( IplImage *eyeComp1, IplImage *eyeComp2 ){
-
-	float max_val1 = 0.f;
-	float max_val2 = 0.f;
-	CvHistogram* hist1 = (CvHistogram*)0;
-	CvHistogram* hist2 = (CvHistogram*)0;
-	IplImage* pup1 = (IplImage*)0;
-	IplImage* pup2 = (IplImage*)0;
-
-	// centroid
-	float x = eyeComp1->width /2;
-	float y = eyeComp1->height /2;
-	// dimension
-	float a = (eyeComp1->width*0.5 + eyeComp1->height*0.5) /2;
-	
-	// area of pupils1 ???????????????????????????????????????????????????????????
-	pup1 = cvCreateImage(cvSize(a,a), eyeComp1->depth,eyeComp1->nChannels);
-	cvSetImageROI(eyeComp1, cvRect( x - a/2, y - a/2, a, a ));
-	cvCopyImage(eyeComp1, pup1);
-	cvResetImageROI(eyeComp1);
-
-	// centroid
-	x = eyeComp2->width /2;
-	y = eyeComp2->height /2;
-	// dimension
-	a = (eyeComp2->width*0.5 + eyeComp2->height*0.5) /2;
-
-	// area of pupils ???????????????????????????????????????????????????????????
-	pup2 = cvCreateImage(cvSize(a,a), eyeComp2->depth,eyeComp2->nChannels);
-	cvSetImageROI(eyeComp2, cvRect( x - a/2, y - a/2, a, a ));
-	cvCopyImage(eyeComp2, pup1);
-	cvResetImageROI(eyeComp2);
-
-	hist1 = createHist( pup1 );
-	hist2 = createHist( pup2 );
-
-	if( hist1 )
-		cvGetMinMaxHistValue( hist1, 0, &max_val1, 0, 0 );
-	if( hist2 )
-		cvGetMinMaxHistValue( hist2, 0, &max_val2, 0, 0 );
-
-	cout<< max_val1 << "  " << max_val2 << endl;
-	
-	// TODO: RGB, red, green, brown, black
-
-	if(hist1)cvReleaseHist(&hist1);
-	if(hist2)cvReleaseHist(&hist2);
-	if(pup1)cvReleaseImage(&pup1);
-	if(pup2)cvReleaseImage(&pup2);
+	// release
+	if(!cur_img.empty())cur_img.clear();
+	if(!cur_r.empty())cur_r.clear();
 
 	return false;
 }
 
-CvHistogram* BlinkDetection::createHist( IplImage* img ) {
+void BlinkDetection::createTemplate(IplImage* frame,CvRect* leftEye,CvRect* rightEye) {
+	if( frame && leftEye && rightEye ) {
+		if(!templ_img.empty())templ_img.clear();
+		if(!templ_r.empty())templ_r.clear();
+
+		IplImage* tmp = 0;
+
+		templ_r.insert(templ_r.end(), leftEye); 
+		templ_r.insert(templ_r.end(), rightEye);
+			 
+		tmp = cvCreateImage( cvSize( leftEye->width, leftEye->height ),
+									 frame->depth, frame->nChannels );
+		cvSetImageROI(frame, *templ_r.at(0));
+		templ_img.insert( templ_img.end(), cvCloneImage(frame) );
+		cvResetImageROI(frame);
+		cvSetImageROI(frame, *templ_r.at(1));
+		templ_img.insert( templ_img.end(), cvCloneImage(frame) );
+		cvResetImageROI(frame);
+	}
+}
+
+bool BlinkDetection::match( vector<IplImage*> cur_img, vector<CvRect*> cur_r ) {
+
+	IplImage* tm = 0;
+	curTime = time(0);
+
+	if( cur_img.empty() && cur_r.empty() ) {
+
+		// eye matching
+		//cvMatchTemplate(cur_img, tpl, tm, CV_);
+
+		/* TODO: 
+			- template matching
+			- min/max in ncc vector schreiben
+			- blinken nach 2 sec auswerten?
+		*/
+
+
+	}
+	return false;
+}
+
+
+CvHistogram* BlinkDetection::createHist( const IplImage* img ) {
 
 	int hdims = 16;
 	float hranges_arr[] = {0,180};
 	float * hranges = hranges_arr;
 
-	CvHistogram* hist = (CvHistogram*)0;
-	IplImage *hue = (IplImage *)0;
-	IplImage *sat = (IplImage *)0;
-	IplImage *val = (IplImage *)0;
-	//IplImage *backproject = (IplImage *)0;
-	
+	CvHistogram* hist = 0;
+	IplImage *hue = 0;
+	IplImage *sat = 0;
+	IplImage *val = 0;
+	IplImage *_img = 0;
 
 	if(img) {
-		// convert from BGR to HSV
-		cvCvtColor(img, img, CV_BGR2HSV);
+		_img = cvCloneImage(img);
 
-		hue = cvCreateImage(cvGetSize(img), IPL_DEPTH_8U, 1);
-		sat = cvCreateImage(cvGetSize(img), IPL_DEPTH_8U, 1);
-		val = cvCreateImage(cvGetSize(img), IPL_DEPTH_8U, 1);
+		// convert from BGR to HSV
+		cvCvtColor(_img, _img, CV_BGR2HSV);
+
+		hue = cvCreateImage(cvGetSize(_img), IPL_DEPTH_8U, 1);
+		sat = cvCreateImage(cvGetSize(_img), IPL_DEPTH_8U, 1);
+		val = cvCreateImage(cvGetSize(_img), IPL_DEPTH_8U, 1);
 		hist = cvCreateHist( 1, &hdims, CV_HIST_ARRAY, &hranges, 1 );
 
-		cvCvtPixToPlane( img, hue, sat, val, 0 );
+		cvCvtPixToPlane( _img, hue, sat, val, 0 );
 		cvCalcHist( &hue, hist );
 		cvNormalizeHist( hist, 1000 );
 		
 		// release
-		if(hist)cvReleaseHist(&hist);
 		if(hue)cvReleaseImage(&hue);
 		if(sat)cvReleaseImage(&sat);
 		if(val)cvReleaseImage(&val);
+		if(_img)cvReleaseImage(&_img);
 	}
 
 	return hist;
-}
-
-CvScalar hsv2rgb( float hue )
-{
-    int rgb[3], p, sector;
-    static const int sector_data[][3]=
-        {{0,2,1}, {1,2,0}, {1,0,2}, {2,0,1}, {2,1,0}, {0,1,2}};
-    hue *= 0.033333333333333333333333333333333f;
-    sector = cvFloor(hue);
-    p = cvRound(255*(hue - sector));
-    p ^= sector & 1 ? 255 : 0;
-
-    rgb[sector_data[sector][0]] = 255;
-    rgb[sector_data[sector][1]] = 0;
-    rgb[sector_data[sector][2]] = p;
-
-    return cvScalar(rgb[2], rgb[1], rgb[0],0);
-}
+}	
