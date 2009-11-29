@@ -33,17 +33,32 @@ void Blinker::play_CB_stat(void* v){
 */
 void Blinker::play_CB(){
 	CvRect* rect = 0;
+	IplImage* img_help = 0;
 
 	if(flag_play == false) 
 		return;
 
+
 	img_frame = cap.getFrame();
 	img_frame = detection->detectVideo( img_frame );
-	if( detection->detectBlink( img_frame, detection->rEyes ) )
-		cout << "Blink!";
 
 	win_frame->setImage( img_frame );
 	scroll->redraw();
+
+	if( detection->detectBlink( img_frame, detection->rEyes ) ) {
+		img_help = cvCreateImage( cvSize( scroll_snapshot->w(),
+								          scroll_snapshot->h() ), 
+								  IPL_DEPTH_8U, 
+								  3 );
+		cvResize( img_frame, img_help, CV_INTER_LINEAR );
+		cvCopyImage(img_help,img_snapshot,NULL);
+		cout << "BlinkBlink!" << endl;
+		/*win_snapshot->setImage( img_snapshot );
+		scroll_snapshot->redraw();*/
+	}
+
+	if(img_help)cvReleaseImage(&img_help);
+
 	Fl::wait(0);
 
 	Fl::add_timeout(0.04, (Fl_Timeout_Handler)play_CB_stat, this);
@@ -57,7 +72,6 @@ void Blinker::openCam_CB(){
 	try {
 		cap.captureFromCamera(0);
 		win_frame->setImage(cap.getFrame());		
-		scroll_eye->redraw();
 		scroll->redraw();
 		flag_play = true;
 		Fl::add_timeout(0.04, (Fl_Timeout_Handler)play_CB_stat, this);
@@ -72,14 +86,11 @@ void Blinker::openCam_CB(){
 Blinker::Blinker(int width = 700, int height =400, const char* title = "Blinker"):Fl_Double_Window(width,height,title){
 	flag_play			= false;
 	scroll				= (Fl_Scroll*)0;
-	scroll_eye			= (Fl_Scroll*)0;
-	scroll_eye_template = (Fl_Scroll*)0;
+	scroll_snapshot     = (Fl_Scroll*)0;
 	win_frame			= (CWindow*)0;
-	win_eye				= (CWindow*)0;
-	win_eye_template	= (CWindow*)0;
+	win_snapshot		= (CWindow*)0;
 	img_frame			= (IplImage*)0;
-	img_eye				= (IplImage*)0;
-	img_eye_template	= (IplImage*)0;
+	img_snapshot		= (IplImage*)0;
 
 	/*face = new CFace();*/
 	detection = new CDetection();
@@ -91,7 +102,8 @@ Blinker::Blinker(int width = 700, int height =400, const char* title = "Blinker"
 Blinker::~Blinker(){
 	if( img_frame )
 		cvReleaseImage( &img_frame );
-
+	if( img_snapshot )
+		cvReleaseImage( &img_snapshot );
 	/*delete face;*/
 }
 
@@ -99,6 +111,7 @@ Blinker::~Blinker(){
 	Diese Methode erzeugt die Fensterapplikation.  
 */
 void Blinker::creatWin(){
+	int width, height;
 	try {
 		this->color((Fl_Color)31);
 		this->begin();
@@ -111,19 +124,18 @@ void Blinker::creatWin(){
 			scroll->end();
 		}		
 		{
-			scroll_eye_template = new Fl_Scroll(500, 10, 100, 100);
-			scroll_eye_template->box(FL_EMBOSSED_FRAME);
-			scroll_eye_template->color((Fl_Color)23);
-			win_eye_template = new CWindow(505, 15, 90, 90);
-			scroll_eye_template->end();
-		}
-		{
-			scroll_eye = new Fl_Scroll(500, 150, 100, 100);
-			scroll_eye->box(FL_EMBOSSED_FRAME);
-			scroll_eye->color((Fl_Color)23);
-			win_eye = new CWindow(505, 155, 90, 90);
-			scroll_eye->add(win_eye);
-			scroll_eye->end();
+			width = scroll->w()/3;
+			height = scroll->h()/3;
+			scroll_snapshot = new Fl_Scroll(500, 150, width, height);
+			scroll_snapshot->box(FL_EMBOSSED_FRAME);
+			scroll_snapshot->color((Fl_Color)23);
+			win_snapshot = new CWindow(505, 155, width-10, height-10);
+			scroll_snapshot->add(win_snapshot);
+			scroll_snapshot->end();
+			img_snapshot = cvCreateImage( cvSize( scroll_snapshot->w(),
+								          scroll_snapshot->h() ), 
+										  IPL_DEPTH_8U, 
+										  3 );
 		}
 
 		this->end();

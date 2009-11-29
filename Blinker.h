@@ -76,9 +76,7 @@ class Blinker:public Fl_Double_Window{
 		*/
 		Fl_Scroll* scroll;
 
-		Fl_Scroll* scroll_eye;
-
-		Fl_Scroll* scroll_eye_template;
+		Fl_Scroll* scroll_snapshot;
 
 		/*
 			Button, dessen Druecken einen Verbindungsaufbau zu einer
@@ -92,18 +90,15 @@ class Blinker:public Fl_Double_Window{
 		*/
 		CWindow* win_frame;
 
-		CWindow* win_eye;
-
-		CWindow* win_eye_template;
+		CWindow* win_snapshot;
 
 		/*
 			Speichert bei Wiedergabe des Videos Bild fuer Bild.
 		*/
 		IplImage* img_frame;
 
-		IplImage* img_eye;
+		IplImage* img_snapshot;
 
-		IplImage* img_eye_template;
 
 		/*
 			Ermoeglicht den Verbindugnsaufbau und das Zugreifen auf Daten einer Webcam.

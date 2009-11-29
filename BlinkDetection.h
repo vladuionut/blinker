@@ -7,7 +7,7 @@
 
 //other
 #include <vector>
-#include <time.h>
+#include <ctime>
 
 
 #include <iostream>
@@ -26,6 +26,7 @@ protected:
 	vector<IplImage*> templ_img;
 	vector<CvRect*> templ_r;
 	float treshval;
+	int numb_blink;
 		
 	CvHistogram* createHist( const IplImage* );
 	void createTemplate(IplImage*,CvRect*,CvRect*);
@@ -34,8 +35,8 @@ protected:
 
 private:
 	bool flag_match;
+	bool flag_ncc[3];
 	time_t startTime;
 	time_t curTime;
-	vector<float> ncc;
 };
 
