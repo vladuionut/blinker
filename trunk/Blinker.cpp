@@ -34,27 +34,42 @@ void Blinker::play_CB_stat(void* v){
 void Blinker::play_CB(){
 	CvRect* rect = 0;
 	IplImage* img_help = 0;
+	int userNumb = -1;
 
 	if(flag_play == false) 
 		return;
 
-
 	img_frame = cap.getFrame();
 	img_frame = detection->detectVideo( img_frame );
+
+	/* find user */
 
 	win_frame->setImage( img_frame );
 	scroll->redraw();
 
-	if( detection->detectBlink( img_frame, detection->rEyes ) ) {
-		img_help = cvCreateImage( cvSize( scroll_snapshot->w(),
-								          scroll_snapshot->h() ), 
-								  IPL_DEPTH_8U, 
-								  3 );
-		cvResize( img_frame, img_help, CV_INTER_LINEAR );
-		cvCopyImage(img_help,img_snapshot,NULL);
-		cout << "BlinkBlink!" << endl;
-		/*win_snapshot->setImage( img_snapshot );
-		scroll_snapshot->redraw();*/
+	if( !detection->rEyes.empty() && detection->rFace ) {
+		cvSetImageROI( img_frame, *detection->rEyes.at(0) );
+		userNumb = isNewUser( img_frame );
+		cvResetImageROI( img_frame );
+	
+		if( detection->detectBlink( img_frame, detection->rEyes ) ) {
+			switch(userNumb) {
+				case 0: {	img_help = cvCreateImage( cvSize( scroll_snapshot->w(),
+													  scroll_snapshot->h() ), 
+													  IPL_DEPTH_8U, 
+													  3 );
+							cvResize( img_frame, img_help, CV_INTER_LINEAR );
+							cvCopyImage(img_help,img_snapshot,NULL);
+							cout << "BlinkBlink!" << endl;
+							/*win_snapshot->setImage( img_snapshot );
+							scroll_snapshot->redraw();*/
+						} break;
+				case 1: { 
+					//other user
+						} break;
+				default: break;
+			}
+		}
 	}
 
 	if(img_help)cvReleaseImage(&img_help);
@@ -91,6 +106,7 @@ Blinker::Blinker(int width = 700, int height =400, const char* title = "Blinker"
 	win_snapshot		= (CWindow*)0;
 	img_frame			= (IplImage*)0;
 	img_snapshot		= (IplImage*)0;
+	user				=  vector<BlinkerUser>();
 
 	/*face = new CFace();*/
 	detection = new CDetection();
@@ -146,6 +162,24 @@ void Blinker::creatWin(){
 	} catch(exception &ex){
 		cerr << ex.what() << endl;
 	}
+}
+
+int Blinker::isNewUser( IplImage* frame ) {
+	int userNumb = -1;
+	CvHistogram * hist = 0;
+	float comp;
+
+	hist = detection->createHist(frame);
+
+	for( int i = 0; i < user.size(); i++ ) {
+		comp  = 1 - cvCompareHist(hist, user.at(i).hist, CV_COMP_BHATTACHARYYA);
+		if(comp > 0.6)
+			return i;
+	}
+	
+	// new user
+	user.insert( user.begin(), Blinker::BlinkerUser( frame, detection->createHist( frame ) ) );
+	return user.size()-1;
 }
 
 /*

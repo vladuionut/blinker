@@ -1,4 +1,4 @@
-
+#include "stdafx.h"
 
 // OpenCV
 #include <cv.h>
@@ -29,7 +29,6 @@ protected:
 	int blinksec;
 	int count_lost;
 		
-	CvHistogram* createHist( const IplImage* );
 	void createTemplate(IplImage*,CvRect*,CvRect*);
 	bool match(vector<IplImage*>,vector<CvRect*>);
 	
