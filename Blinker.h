@@ -137,4 +137,27 @@ class Blinker:public Fl_Double_Window{
 			zu holen und auszugeben.
 		*/
 		void play_CB();
+
+		typedef struct BlinkerUser{
+				IplImage* img;
+				CvHistogram* hist;
+				BlinkerUser( IplImage* i = (IplImage*)0, CvHistogram* h = (CvHistogram*)0 ) {
+					int hdims = 16; /* TODO: make that static in CDetection  */
+					float hranges_arr[2] = {0,180};
+				    float * hranges = hranges_arr;
+					
+					img = cvCreateImage( cvGetSize(i), i->depth, i->nChannels );
+					cvCopyImage(i,img);
+					hist = cvCreateHist( 1, &hdims, 
+											CV_HIST_ARRAY, 
+											&hranges, 1 );
+					cvCopyHist(h,&hist);
+				}
+				/*~BlinkerUser() {
+					if(img)cvReleaseImage(&img);
+					if(hist)cvReleaseHist(&hist);
+				}*/
+		};
+		vector<BlinkerUser> user;
+		int isNewUser( IplImage* );
 };

@@ -24,6 +24,8 @@ using namespace std;
 class CDetection {
 
 public:
+	//friend typedef struct Blinker::BlinkerUser;
+
 	CDetection();
 	~CDetection();
 
@@ -32,6 +34,7 @@ public:
 	vector<CvRect*> rEyes;
 	bool detectBlink(IplImage*);
 	bool detectBlink(IplImage*, vector<CvRect*>);
+	CvHistogram* createHist( const IplImage* );
 
 private:
 	CvHaarClassifierCascade* cascade_face;
