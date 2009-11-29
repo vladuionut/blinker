@@ -33,11 +33,15 @@ bool BlinkDetection::detect( IplImage* frame, vector<CvRect*> eyes ) {
 
 	curTime = time(0);
 
-	if( !frame )
+	if( !frame ||
+		(  eyes == (vector<CvRect*>)0 || !eyes.at(0) || !eyes.at(1) ) ) {
+		startTime = time(0);
+		curTime = time(0);
+		flag_match = false;
+		flag_ncc[0] = (flag_ncc[1]= (flag_ncc[2]= false ));
+		numb_blink = 0;
 		return false;
-	
-	if(  eyes == (vector<CvRect*>)0 || !eyes.at(0) || !eyes.at(1) )
-		return false;
+	}
 
 	/*if(m_frame)cvReleaseImage(&m_frame);
 	m_frame = cvCreateImage(cvGetSize(frame),frame->depth,frame->nChannels);
@@ -88,8 +92,10 @@ bool BlinkDetection::detect( IplImage* frame, vector<CvRect*> eyes ) {
 
 		if( match( cur_img, cur_r ) ) {
 			if( difftime(curTime, startTime) > 2 ) {
-				if( numb_blink > 0 )
+				if( numb_blink > 0 ) {
+					flag_match = true;
 					return true;
+				}
 				flag_match = true; // loop frame by frame for 2 sec
 			}
 			return false;
