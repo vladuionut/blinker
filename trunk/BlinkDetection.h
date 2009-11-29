@@ -26,7 +26,8 @@ protected:
 	vector<IplImage*> templ_img;
 	vector<CvRect*> templ_r;
 	float treshval;
-	int numb_blink;
+	int blinksec;
+	int count_lost;
 		
 	CvHistogram* createHist( const IplImage* );
 	void createTemplate(IplImage*,CvRect*,CvRect*);
