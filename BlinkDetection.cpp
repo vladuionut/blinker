@@ -27,8 +27,6 @@ bool BlinkDetection::detect( IplImage* frame, vector<CvRect*> eyes ) {
 	vector<CvRect*> cur_r = vector<CvRect*>();
 	IplImage* leftTmp = 0;
 	IplImage* rightTmp = 0;
-	CvRect* size = 0;
-	int x, y, width, height;
 
 	curTime = time(0);
 
@@ -56,37 +54,22 @@ bool BlinkDetection::detect( IplImage* frame, vector<CvRect*> eyes ) {
 			flag_ncc[0] = (flag_ncc[1]= (flag_ncc[2]= false ));
 			blinksec = 0;
 		}
-		size = new CvRect();
+
 		cur_r.insert(cur_r.end(), eyes.at(0)); 
 		cur_r.insert(cur_r.end(),  eyes.at(1));
-		cur_r.insert(cur_r.begin(), size );
 			 
-		leftTmp = cvCreateImage( cvSize(cur_r.at(1)->width,cur_r.at(1)->height), frame->depth, frame->nChannels );
-		rightTmp = cvCreateImage( cvSize(cur_r.at(2)->width,cur_r.at(2)->height), frame->depth, frame->nChannels );
+		leftTmp = cvCreateImage( cvSize(cur_r.at(0)->width,cur_r.at(0)->height), frame->depth, frame->nChannels );
+		rightTmp = cvCreateImage( cvSize(cur_r.at(1)->width,cur_r.at(1)->height), frame->depth, frame->nChannels );
 
-		cvSetImageROI( frame, *cur_r.at(1) );
+		cvSetImageROI( frame, *cur_r.at(0) );
 		cvCopy(frame, leftTmp);
 		cvResetImageROI(frame);
 		cur_img.insert( cur_img.end(), leftTmp );
 		
-		cvSetImageROI(  frame, *cur_r.at(2) );
+		cvSetImageROI(  frame, *cur_r.at(1) );
 		cvCopyImage(frame, rightTmp);
 		cvResetImageROI(frame);
 		cur_img.insert( cur_img.end(),rightTmp  );
-
-		x = min(cur_r.at(1)->x, cur_r.at(2)->x);
-		y = min(cur_r.at(1)->y, cur_r.at(2)->y);
-		width = (cur_r.at(1)->width + cur_r.at(2)->width)/2;
-		height = (cur_r.at(1)->height + cur_r.at(2)->height)/2;
-		// estimator of eye
-		x += width/4;
-		y += height/4;	
-		width = width*0.7;
-		height = height*0.7;
-		cur_r.at(0)->x = x;
-		cur_r.at(0)->y = y;
-		cur_r.at(0)->width = width;
-		cur_r.at(0)->height = height;
 
 		if( match( cur_img, cur_r ) ) {
 			if( startTime != 0 && blinksec > 2 ) {
@@ -100,7 +83,6 @@ bool BlinkDetection::detect( IplImage* frame, vector<CvRect*> eyes ) {
 	}
 
 	// release
-	if(size) delete size;
 	if(!cur_img.empty())cur_img.clear();
 	if(!cur_r.empty())cur_r.clear();
 	if(leftTmp)cvReleaseImage(&leftTmp);
@@ -114,30 +96,36 @@ void BlinkDetection::createTemplate(IplImage* frame,CvRect* leftEye,CvRect* righ
 		if(!templ_img.empty())templ_img.clear();
 		if(!templ_r.empty())templ_r.clear();
 
-		int x, y, width, height;
-		CvRect* size  = 0;
+		int width, height;
+		CvRect* lSize  = 0;
+		CvRect* rSize  = 0;
 		IplImage* leftTmp = 0;
 		IplImage* rightTmp = 0;
 
+		lSize = new CvRect();
+		rSize = new CvRect();
 
-		x = min(leftEye->x, rightEye->x);
-		y = min(leftEye->y, rightEye->y);
 		width = (leftEye->width + rightEye->width)/2;
 		height = (leftEye->height + rightEye->height)/2;
 		// fit template window to eye
-		x += width/4;
-		y += height/4;			/* maybe there is a better way to do this, morph, opening, comp, hist??*/
-		width = width*0.7;
-		height = height*0.7;
-		size = new CvRect();
-		size->x = x;
-		size->y = y;
-		size->width = width;
-		size->height = height;
+		lSize->x = leftEye->x + width/33;
+		rSize->y = leftEye->y + height/4;
+		rSize->x = rightEye->x + width/45;
+		lSize->y = rightEye->y + height/4;
+		
+		width = width*0.9;
+		height = height*0.8;
+		
+		lSize->width = width;
+		lSize->height = height;
+		rSize->width = width;
+		rSize->height = height;
 
 		templ_r.insert(templ_r.end(), leftEye); 
 		templ_r.insert(templ_r.end(), rightEye);
-		templ_r.insert(templ_r.begin(), size);
+		templ_r.insert(templ_r.begin(), rSize);
+		templ_r.insert(templ_r.begin(), lSize);
+
 
 		leftTmp = cvCreateImage( cvSize(width,height), frame->depth, frame->nChannels );
 		rightTmp = cvCreateImage( cvSize(width,height), frame->depth, frame->nChannels );
@@ -147,7 +135,7 @@ void BlinkDetection::createTemplate(IplImage* frame,CvRect* leftEye,CvRect* righ
 		cvResetImageROI(frame);
 		templ_img.insert( templ_img.end(), cvCloneImage(leftTmp) );
 
-		cvSetImageROI(  frame, *templ_r.at(0) );
+		cvSetImageROI(  frame, *templ_r.at(1) );
 		cvCopyImage(frame, rightTmp, NULL);
 		cvResetImageROI(frame);
 		templ_img.insert( templ_img.end(), cvCloneImage(rightTmp) );
@@ -176,6 +164,9 @@ bool BlinkDetection::match( vector<IplImage*> cur_img, vector<CvRect*> cur_r ) {
 	// size of matching window
 	width = cur_img.at(0)->width - templ_img.at(0)->width + 1;
 	height = cur_img.at(0)->height - templ_img.at(0)->height + 1;
+	if( width <= 0 && height <= 0 )
+		return false;
+
 	tm_img = cvCreateImage(cvSize(width, height), IPL_DEPTH_32F, 1);
 
 	// template matching
@@ -195,34 +186,42 @@ bool BlinkDetection::match( vector<IplImage*> cur_img, vector<CvRect*> cur_r ) {
 
 	maxval = (leftMaxval + rightMaxval) / 2;
 
+
+	//cout << "val of eyes: " << leftMaxval << " " << rightMaxval << " " << maxval << endl;
+
 	if( maxval < 0.45 ) {			   // lost eye position
 		return false;
+		cout << maxval << " lost eye" <<endl;
 	}
 	else if( maxval >= 0.45 && maxval < 0.6 ) {// closed eye
 	  --count_lost;
 		if(startTime == 0)
 			startTime = time(0);
 		flag_ncc[1] = true;
+	   cout << maxval << " closed eye" <<endl;
 	}
-	else if( maxval > 0.8 )	{		   // open eye
+	else if( maxval > 0.75 )	{		   // open eye
 	  --count_lost;
 		if(flag_ncc[1]) {
 			flag_ncc[2] = true;
 			this->blinksec = difftime(curTime,startTime);
-			startTime = 0;
+			startTime = 0; cout<< "1";
 		}
 		else{
 	      --count_lost;
 			flag_ncc[0] = true;
-			startTime = 0;
+			startTime = 0;cout<< "2";
 		}
+			   cout << maxval << " open eye" <<endl;
 	} else {
 		--count_lost; // something in between
 		startTime = 0;
+	 cout << maxval << " between " <<endl;
 	}
 
 	if( flag_ncc[0] && flag_ncc[1] && flag_ncc[2] ) {
 		flag_ncc[0] = (flag_ncc[1]= (flag_ncc[2]= false ));
+			   cout << maxval << " true blinked " <<endl;
 	}
 
 	return true;
